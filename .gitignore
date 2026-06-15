@@ -1,0 +1,20 @@
+# Uncompressed dictionary (regenerate: node scripts/build-dictionary.mjs)
+data/dictionary.json
+data/forms.json
+
+# OS
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Editor
+.vscode/
+.idea/
+*.swp
+
+# Secrets
+.env
+.env.*
+
+# Build script deps
+node_modules/

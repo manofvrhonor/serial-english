@@ -1,0 +1,35 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Serial English</title>
+  <link rel="stylesheet" href="css/styles.css" />
+</head>
+<body>
+  <div class="app">
+    <!-- Боковое меню -->
+    <aside class="sidebar">
+      <div class="logo">📺 Serial English</div>
+      <nav class="menu">
+        <button class="menu-item" data-route="import">📥 Импорт</button>
+        <button class="menu-item" data-route="words">🔤 Слова</button>
+        <button class="menu-item" data-route="phrases">💬 Выражения</button>
+        <button class="menu-item" data-route="training">🎯 Тренировка</button>
+        <button class="menu-item" data-route="shows">📺 Сериалы</button>
+        <button class="menu-item" data-route="books">📚 Книги</button>
+        <button class="menu-item" data-route="knowledge">🧠 База знаний</button>
+        <button class="menu-item" data-route="settings">⚙️ Настройки</button>
+      </nav>
+    </aside>
+
+    <!-- Рабочая область: сюда роутер вставляет разделы -->
+    <main class="content" id="content">
+      <!-- содержимое подставляется через JS -->
+    </main>
+  </div>
+
+  <!-- Подключаем скрипты как модули (порядок не важен, импорты внутри) -->
+  <script type="module" src="js/app.js"></script>
+</body>
+</html>
