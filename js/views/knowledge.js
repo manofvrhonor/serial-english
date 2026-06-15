@@ -19,7 +19,8 @@ function draw(el, ctx) {
   const phrases = filterItems(getKnowledgePhrases(ctx.state), query, (x) => x.text);
 
   el.innerHTML = `
-    <h1 class="view-title">🧠 База знаний</h1>
+    <div class="page">
+    <h1 class="view-title">База знаний</h1>
     <p class="view-subtitle">Выученные слова и выражения. Не попадут в импорт.</p>
 
     <div class="list-toolbar">
@@ -49,6 +50,7 @@ function draw(el, ctx) {
         </tr></thead>
         <tbody id="k-phrases">${phrases.map((p) => phraseRow(p)).join("") || emptyRow(3)}</tbody>
       </table>
+    </div>
     </div>
   `;
 

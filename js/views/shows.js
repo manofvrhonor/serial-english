@@ -6,11 +6,13 @@ export function renderShows(el, ctx) {
 
   if (!shows.length) {
     el.innerHTML = `
-      <h1 class="view-title">📺 Сериалы</h1>
+      <div class="page">
+      <h1 class="view-title">Сериалы</h1>
       <p class="view-subtitle">Вложенность: Сериал → Сезон → Серия.</p>
       <div class="placeholder">
         Пока нет сериалов. Импортируйте файл <b>.srt</b> в разделе «Импорт» —
         сериал, сезон и серия создадутся автоматически.
+      </div>
       </div>`;
     return;
   }
@@ -18,9 +20,11 @@ export function renderShows(el, ctx) {
   const tree = shows.map((show) => renderShow(ctx, show)).join("");
 
   el.innerHTML = `
-    <h1 class="view-title">📺 Сериалы</h1>
+    <div class="page">
+    <h1 class="view-title">Сериалы</h1>
     <p class="view-subtitle">Готовность = выученные / все слова и выражения серии.</p>
-    <div class="tree">${tree}</div>`;
+    <div class="tree">${tree}</div>
+    </div>`;
 
   el.querySelectorAll(".tree-prep-btn").forEach((btn) => {
     btn.addEventListener("click", () => {

@@ -16,7 +16,8 @@ export function renderSettings(el, ctx) {
   const due = countDue(ctx.state);
 
   el.innerHTML = `
-    <h1 class="view-title">⚙️ Настройки</h1>
+    <div class="page">
+    <h1 class="view-title">Настройки</h1>
     <p class="view-subtitle">Интервалы SRS, стоп-лист, экспорт данных.</p>
 
     <div class="settings-grid">
@@ -75,6 +76,7 @@ export function renderSettings(el, ctx) {
         <button id="hard-reset" class="btn btn-danger">HARD RESET — начать с нуля</button>
       </section>
 
+    </div>
     </div>
   `;
 

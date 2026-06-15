@@ -6,6 +6,7 @@ import {
   markWordLearned,
   unmarkWordLearned,
 } from "../db/database.js";
+import { transChipsHtml, bindTransChipsContainers } from "../ui/trans-chips.js";
 
 let filter = "all";
 let query = "";
@@ -20,8 +21,14 @@ function draw(el, ctx) {
   const words = getFilteredWords(ctx.state);
 
   el.innerHTML = `
-    <h1 class="view-title">🔤 Слова</h1>
-    <p class="view-subtitle">Список слов с переводами и SRS.</p>
+    <div class="page">
+    <div class="page-header-row">
+      <div>
+        <h1 class="view-title">Слова</h1>
+        <p class="view-subtitle">${words.length} из ${ctx.state.words.length} · переводы и SRS</p>
+      </div>
+      <button id="w-add" class="btn btn-sm">+ Добавить</button>
+    </div>
 
     <div class="list-toolbar">
       <input type="search" id="w-search" class="list-search" placeholder="Поиск по лемме или переводу…" value="${esc(query)}" />
@@ -30,25 +37,25 @@ function draw(el, ctx) {
         <option value="active" ${filter === "active" ? "selected" : ""}>В изучении</option>
         <option value="learned" ${filter === "learned" ? "selected" : ""}>Выучено</option>
       </select>
-      <button id="w-add" class="btn">+ Добавить слово</button>
     </div>
 
     <div id="w-add-form" class="list-add-form" hidden>
       <input type="text" id="w-new-lemma" placeholder="Лемма (english)" />
-      <input type="text" id="w-new-trans" placeholder="Переводы через запятую" />
+      <div id="w-new-trans-chips"></div>
       <button id="w-save-new" class="btn">Сохранить</button>
       <button id="w-cancel-new" class="btn secondary">Отмена</button>
     </div>
 
-    <div class="list-summary">${words.length} из ${ctx.state.words.length}</div>
-
-    <div class="list-table-wrap">
-      <table class="list-table">
-        <thead><tr>
-          <th>Лемма</th><th>Переводы</th><th>Источники</th><th>SRS</th><th>Действия</th>
-        </tr></thead>
-        <tbody id="w-tbody">${words.map((w) => rowHtml(w, ctx)).join("") || emptyRow()}</tbody>
-      </table>
+    <div class="card list-card">
+      <div class="list-table-wrap">
+        <table class="list-table">
+          <thead><tr>
+            <th>Лемма</th><th>Переводы</th><th>Источники</th><th>SRS</th><th></th>
+          </tr></thead>
+          <tbody id="w-tbody">${words.map((w) => rowHtml(w, ctx)).join("") || emptyRow()}</tbody>
+        </table>
+      </div>
+    </div>
     </div>
   `;
 
@@ -62,13 +69,19 @@ function draw(el, ctx) {
   });
   el.querySelector("#w-add").addEventListener("click", () => {
     el.querySelector("#w-add-form").hidden = false;
+    const box = el.querySelector("#w-new-trans-chips");
+    box.innerHTML = transChipsHtml([], { id: "new-word" });
+    bindTransChipsContainers(box.parentElement, { onChange() {} });
   });
   el.querySelector("#w-cancel-new").addEventListener("click", () => {
     el.querySelector("#w-add-form").hidden = true;
   });
   el.querySelector("#w-save-new").addEventListener("click", () => {
     const lemma = el.querySelector("#w-new-lemma").value.trim();
-    const trans = el.querySelector("#w-new-trans").value.split(",").map((s) => s.trim()).filter(Boolean);
+    const chipBox = el.querySelector("#w-new-trans-chips .trans-chips");
+    const trans = chipBox
+      ? [...chipBox.querySelectorAll(".trans-chip-text")].map((n) => n.textContent.trim()).filter(Boolean)
+      : [];
     if (!lemma) return alert("Введите лемму.");
     addWordManual(ctx.state, { lemma, translations: trans });
     ctx.save();
@@ -109,27 +122,26 @@ function rowHtml(w, ctx) {
     <tr data-id="${w.id}">
       <td><strong>${esc(w.lemma)}</strong><br>${status}</td>
       <td class="col-trans-cell">
-        <input type="text" class="list-trans-input" data-id="${w.id}" value="${esc((w.translations || []).join(", "))}" />
+        ${transChipsHtml(w.translations || [], { id: w.id })}
       </td>
       <td class="col-sources">${sourcesLabel(ctx.state, w)}</td>
       <td class="col-srs">${srsLabel(w)}</td>
       <td class="col-actions">
-        <button class="row-btn" data-act="learn" data-id="${w.id}">${w.learned ? "↩ В изучение" : "✓ Выучено"}</button>
-        <button class="row-btn row-btn-stop" data-act="delete" data-id="${w.id}">🗑</button>
+        <button type="button" class="btn outline btn-sm" data-act="learn" data-id="${w.id}" title="${w.learned ? "Вернуть в изучение" : "Выучено"}">${w.learned ? "↩" : "✓"}</button>
+        <button type="button" class="btn outline btn-sm btn-icon-danger" data-act="delete" data-id="${w.id}" title="Удалить слово">✕</button>
       </td>
     </tr>`;
 }
 
 function bindActions(el, ctx) {
-  el.querySelector("#w-tbody")?.querySelectorAll(".list-trans-input").forEach((inp) => {
-    inp.addEventListener("change", () => {
-      const translations = inp.value.split(",").map((s) => s.trim()).filter(Boolean).slice(0, 3);
-      updateWord(ctx.state, inp.dataset.id, { translations });
+  bindTransChipsContainers(el, {
+    onChange(id, translations) {
+      updateWord(ctx.state, id, { translations });
       ctx.save();
-    });
+    },
   });
 
-  el.querySelector("#w-tbody")?.querySelectorAll(".row-btn").forEach((btn) => {
+  el.querySelector("#w-tbody")?.querySelectorAll("[data-act]").forEach((btn) => {
     btn.addEventListener("click", () => {
       const id = btn.dataset.id;
       if (btn.dataset.act === "learn") {
@@ -137,7 +149,6 @@ function bindActions(el, ctx) {
         if (w?.learned) unmarkWordLearned(ctx.state, id);
         else markWordLearned(ctx.state, id);
       } else if (btn.dataset.act === "delete") {
-        if (!confirm("Удалить слово?")) return;
         deleteWord(ctx.state, id);
       }
       ctx.save();

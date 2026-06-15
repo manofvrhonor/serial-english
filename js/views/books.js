@@ -6,11 +6,13 @@ export function renderBooks(el, ctx) {
 
   if (!books.length) {
     el.innerHTML = `
-      <h1 class="view-title">📚 Книги</h1>
+      <div class="page">
+      <h1 class="view-title">Книги</h1>
       <p class="view-subtitle">Вложенность: Книга → Глава.</p>
       <div class="placeholder">
         Пока нет книг. Импортируйте файл <b>.txt</b> в разделе «Импорт» —
         книга и глава создадутся автоматически.
+      </div>
       </div>`;
     return;
   }
@@ -18,9 +20,11 @@ export function renderBooks(el, ctx) {
   const tree = books.map((book) => renderBook(ctx, book)).join("");
 
   el.innerHTML = `
-    <h1 class="view-title">📚 Книги</h1>
+    <div class="page">
+    <h1 class="view-title">Книги</h1>
     <p class="view-subtitle">Готовность = выученные / все слова и выражения главы.</p>
-    <div class="tree">${tree}</div>`;
+    <div class="tree">${tree}</div>
+    </div>`;
 
   el.querySelectorAll(".tree-prep-btn").forEach((btn) => {
     btn.addEventListener("click", () => {

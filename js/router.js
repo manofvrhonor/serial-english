@@ -7,7 +7,6 @@ import { renderBooks } from "./views/books.js";
 import { renderKnowledge } from "./views/knowledge.js";
 import { renderSettings } from "./views/settings.js";
 
-// Карта: имя маршрута → функция отрисовки
 const routes = {
   import: renderImport,
   words: renderWords,
@@ -19,12 +18,45 @@ const routes = {
   settings: renderSettings,
 };
 
-const content = document.getElementById("content");
+const ROUTE_LABELS = {
+  import: "Импорт",
+  words: "Слова",
+  phrases: "Выражения",
+  training: "Тренировка",
+  shows: "Сериалы",
+  books: "Книги",
+  knowledge: "База знаний",
+  settings: "Настройки",
+};
 
-// Контекст приложения { state, save } — приходит из app.js
+const MOBILE_PRIMARY = new Set(["import", "words", "training", "shows"]);
+
+const content = document.getElementById("content");
 let appCtx = null;
 
-// Показать раздел по имени; options.trainingPrep — подготовка к серии/главе
+function setActiveNav(route) {
+  document.querySelectorAll("[data-route]").forEach((el) => {
+    el.classList.toggle("active", el.dataset.route === route);
+  });
+
+  document.querySelectorAll(".mobile-nav-item[data-action='more']").forEach((el) => {
+    el.classList.toggle("active", !MOBILE_PRIMARY.has(route));
+  });
+
+  const title = document.getElementById("mobile-page-title");
+  if (title) title.textContent = ROUTE_LABELS[route] || "Serial English";
+}
+
+function openMobileMore() {
+  const sheet = document.getElementById("mobile-more");
+  if (sheet) sheet.hidden = false;
+}
+
+function closeMobileMore() {
+  const sheet = document.getElementById("mobile-more");
+  if (sheet) sheet.hidden = true;
+}
+
 export function navigateTo(route, options = {}) {
   const render = routes[route];
   if (!render) return;
@@ -36,10 +68,8 @@ export function navigateTo(route, options = {}) {
   }
 
   render(content, appCtx);
-
-  document.querySelectorAll(".menu-item").forEach((btn) => {
-    btn.classList.toggle("active", btn.dataset.route === route);
-  });
+  setActiveNav(route);
+  closeMobileMore();
 }
 
 export function startPrepTraining(sourceId, label) {
@@ -48,14 +78,28 @@ export function startPrepTraining(sourceId, label) {
   });
 }
 
-// Навесить обработчики на пункты меню
-export function initRouter(ctx) {
-  appCtx = ctx;
+function bindNavItem(el) {
+  el.addEventListener("click", () => navigateTo(el.dataset.route));
+}
 
-  document.querySelectorAll(".menu-item").forEach((btn) => {
-    btn.addEventListener("click", () => navigateTo(btn.dataset.route));
+function initShell() {
+  document.querySelectorAll(".menu-item[data-route]").forEach(bindNavItem);
+  document.querySelectorAll(".mobile-nav-item[data-route]").forEach(bindNavItem);
+  document.querySelectorAll(".mobile-more-item[data-route]").forEach(bindNavItem);
+
+  document.querySelectorAll(".mobile-nav-item[data-action='more']").forEach((btn) => {
+    btn.addEventListener("click", openMobileMore);
   });
 
-  // Стартовый раздел
+  document.getElementById("mobile-more-backdrop")?.addEventListener("click", closeMobileMore);
+
+  document.getElementById("sidebar-toggle")?.addEventListener("click", () => {
+    document.getElementById("app")?.classList.toggle("sidebar-collapsed");
+  });
+}
+
+export function initRouter(ctx) {
+  appCtx = ctx;
+  initShell();
   navigateTo("import");
 }

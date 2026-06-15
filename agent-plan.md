@@ -298,9 +298,25 @@ IndexedDB создаётся при первом запуске.
 
 ### СЛЕДУЮЩАЯ ФАЗА
 
-**Этап 9: UI / дизайн (Lovable)**
-- Прототип интерфейса из Lovable → адаптация `css/`, `index.html`, разметки views.
-- Бизнес-логику (`js/core`, `js/db`, `js/import`) не переписывать без необходимости.
+**Этап 9: UI / дизайн (Lovable) — В РАБОТЕ**
+
+Прототип (референс): `D:\VIBECODING\word-weaver-offline` (GitHub: manofvrhonor/word-weaver-offline).
+Основной проект на GitHub: **manofvrhonor/serial-english**.
+
+**Сделано (сессия 2026-06):**
+- Дизайн-токены oklch, новый каркас: sidebar + mobile nav + header (`index.html`, `css/styles.css`, `router.js`).
+- **Импорт:** вкладки Слова/Фразы, режимы Карточки/Список, swipe-стек (`js/ui/swipe-card.js`).
+- **Тренировка (настройки):** segment-кнопки + сетка режимов 2×2 как в Lovable (`training.js`).
+- **Переводы-чипы:** drag-порядок, × удалить, + добавить — `js/ui/trans-chips.js`; в **Слова**, **Выражения**, **Импорт**.
+- **Удаление слова** (✕ в «Слова») → лемма в **стоп-лист** (`deleteWord()` → `addStopWord()`).
+- Исправлен баг: кнопки удаления не работали (неверный селектор `.row-btn`).
+
+**Осталось по Этапу 9:**
+- Настройки, База знаний, Сериалы/Книги — card-layout как в Lovable.
+- Сессия тренировки (карточка во время шагов) — довести до прототипа.
+- Сверка остальных экранов с http://localhost:8080 (Lovable) vs :8081 (наш).
+
+Бизнес-логику (`js/core`, `js/db`, `js/import`) не переписывать без необходимости.
 
 
 ---
@@ -328,6 +344,9 @@ serial-english/
 └── js/
     ├── app.js
     ├── router.js
+    ├── ui/
+    │   ├── swipe-card.js       ← swipe при импорте (Этап 9)
+    │   └── trans-chips.js      ← чипы переводов: порядок, удаление (Этап 9)
     ├── db/
     │   └── database.js     ← IndexedDB, схема v2, экспорт/импорт, хелперы
     ├── import/
@@ -378,10 +397,23 @@ knowledge, sessionHistory. **Не трогает:** офлайн-файлы data
 проекта. Пользовательские дополнения в stopList тоже сбрасываются к дефолту.
 
 ### Запуск dev
-`python -m http.server 8080` → http://localhost:8080
 Рабочая папка: `D:\VIBECODING\SERIAL ENGLISH`
 
+| Приложение | Команда | URL |
+|---|---|---|
+| Serial English | `python -m http.server 8081` | http://localhost:8081 |
+| Lovable-прототип | `npm run dev` в `word-weaver-offline` | http://localhost:8080 |
+
+Git: https://github.com/manofvrhonor/serial-english
+
+### Этап 9 — UI (сессия 2026-06)
+- Референс Lovable: `D:\VIBECODING\word-weaver-offline`.
+- `js/ui/trans-chips.js` — до 3 переводов; drag = порядок топ-1/2/3; используется в words, phrases, import.
+- `deleteWord()` добавляет лемму в `settings.stopList` (не предлагать при импорте).
+- Импорт: swipe ← стоп, → знаю, ↑ к импорту; список с чипами переводов.
+
 ### Следующий шаг агента
-**Этап 9 — UI из Lovable.** Прочитать agent-plan.md (разделы 12–14).
-Адаптировать визуал под прототип Lovable; логику не ломать.
-Прикрепить к чату: скрин/экспорт прототипа Lovable + `@agent-plan.md`.
+**Продолжить Этап 9.** Прочитать agent-plan.md (разделы 12–14).
+Довести UI: Настройки, База знаний, Сериалы/Книги; сверка с Lovable.
+Логику (`js/core`, `js/db`, `js/import`) не ломать.
+Прикрепить к чату: `@agent-plan.md` + конкретный экран/задача.

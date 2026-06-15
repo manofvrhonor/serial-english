@@ -617,6 +617,7 @@ export function updatePhrase(state, id, patch) {
 export function deleteWord(state, id) {
   const idx = state.words.findIndex((w) => w.id === id);
   if (idx === -1) return false;
+  addStopWord(state, state.words[idx].lemma);
   state.words.splice(idx, 1);
   return true;
 }
