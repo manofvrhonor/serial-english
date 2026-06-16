@@ -1,0 +1,10 @@
+# Статический SPA без сборки — публикуем корень репозитория
+[build]
+  publish = "."
+
+# Словари .gz отдаём как бинарные файлы (браузер распаковывает через DecompressionStream)
+[[headers]]
+  for = "/data/*.gz"
+  [headers.values]
+    Content-Type = "application/gzip"
+    Cache-Control = "public, max-age=86400"
