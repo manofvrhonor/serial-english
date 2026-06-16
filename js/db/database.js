@@ -6,18 +6,8 @@ const STORE = "state";
 const STATE_KEY = "main";
 const SCHEMA_VERSION = 2;
 
-// ---------- Генератор id ----------
-export function makeId(prefix = "id") {
-  return `${prefix}_${Math.random().toString(36).slice(2, 8)}${Date.now().toString(36).slice(-3)}`;
-}
-
-// ---------- Пустое состояние (схема v2) ----------
-export function emptyState() {
-  return {
-    version: SCHEMA_VERSION,
-    settings: {
-      intervals: [1, 3, 7, 16, 30],
-      stopList: [
+/** Встроенный стоп-лист (legacy) — при загрузке удаляется из сохранённых данных. */
+const BUILTIN_STOP_LIST = [
   "a", "an", "the",
   "i", "you", "he", "she", "it", "we", "they",
   "me", "him", "her", "us", "them",
@@ -29,7 +19,26 @@ export function emptyState() {
   "and", "or", "but", "so", "if", "then",
   "to", "of", "in", "on", "at", "for", "with", "from", "by",
   "as", "not", "no", "yes",
-],
+];
+
+const BUILTIN_STOP_SET = new Set(BUILTIN_STOP_LIST.map((s) => s.toLowerCase()));
+
+function stripBuiltinStopWords(list) {
+  return (list || []).filter((w) => !BUILTIN_STOP_SET.has(String(w).toLowerCase()));
+}
+
+// ---------- Генератор id ----------
+export function makeId(prefix = "id") {
+  return `${prefix}_${Math.random().toString(36).slice(2, 8)}${Date.now().toString(36).slice(-3)}`;
+}
+
+// ---------- Пустое состояние (схема v2) ----------
+export function emptyState() {
+  return {
+    version: SCHEMA_VERSION,
+    settings: {
+      intervals: [1, 3, 7, 16, 30],
+      stopList: [],
       sessionHistory: [],
       lastSession: null,
     },
@@ -117,6 +126,16 @@ export async function loadState() {
   }
   // Прогоняем через нормализацию (миграция/добивка недостающих полей)
   const normalized = normalizeState(raw);
+  let needsSave = false;
+  if (JSON.stringify(raw?.settings?.stopList) !== JSON.stringify(normalized.settings?.stopList)) {
+    needsSave = true;
+  }
+  if (repairKnowledgeWordCards(normalized)) {
+    needsSave = true;
+  }
+  if (needsSave) {
+    await saveState(normalized);
+  }
   return normalized;
 }
 
@@ -159,7 +178,7 @@ export function normalizeState(data) {
         ? data.settings.intervals.map((n) => Math.max(1, Number(n) || 1)).slice(0, 5)
         : base.settings.intervals,
       stopList: Array.isArray(data?.settings?.stopList)
-        ? data.settings.stopList
+        ? stripBuiltinStopWords(data.settings.stopList)
         : [],
       sessionHistory: Array.isArray(data?.settings?.sessionHistory)
         ? data.settings.sessionHistory.slice(0, 20)
@@ -424,6 +443,20 @@ export function isKnownPhrase(state, text) {
 export function isStopWord(state, lemma) {
   const l = String(lemma).toLowerCase().trim();
   return state.settings.stopList.some((x) => String(x).toLowerCase() === l);
+}
+
+export function isStudyingLemma(state, lemma) {
+  const l = String(lemma).toLowerCase().trim();
+  return (state.words || []).some(
+    (w) => !w.learned && String(w.lemma).toLowerCase() === l
+  );
+}
+
+export function isStudyingPhrase(state, text) {
+  const t = String(text).toLowerCase().trim();
+  return (state.phrases || []).some(
+    (p) => !p.learned && String(p.text).toLowerCase() === t
+  );
 }
 
 
@@ -691,6 +724,35 @@ export function removeKnownPhrase(state, text) {
 //  БАЗА ЗНАНИЙ (Этап 7)
 // ===================================================================
 
+export function getStopListWords(state) {
+  return (state.settings?.stopList || [])
+    .map((lemma) => {
+      const trimmed = String(lemma).trim();
+      return {
+        lemma: trimmed,
+        word: findWordByLemma(state, trimmed),
+      };
+    })
+    .sort((a, b) => a.lemma.localeCompare(b.lemma));
+}
+
+export function returnStopWordToStudy(state, lemma) {
+  const l = String(lemma).toLowerCase().trim();
+  if (!l || !isStopWord(state, lemma)) return false;
+
+  removeStopWord(state, lemma);
+  removeKnownLemma(state, lemma);
+
+  const existing = findWordByLemma(state, lemma);
+  if (existing) {
+    existing.learned = false;
+    existing.srs = emptySrs();
+  } else {
+    addWordManual(state, { lemma: String(lemma).trim(), translations: [] });
+  }
+  return true;
+}
+
 export function getKnowledgeWords(state) {
   const map = new Map();
 
@@ -744,6 +806,8 @@ export function returnWordToStudy(state, lemma) {
   if (word) {
     word.learned = false;
     word.srs = emptySrs();
+  } else {
+    addWordManual(state, { lemma: String(lemma).trim(), translations: [] });
   }
   return true;
 }
@@ -756,6 +820,8 @@ export function returnPhraseToStudy(state, text) {
   if (phrase) {
     phrase.learned = false;
     phrase.srs = emptySrs();
+  } else {
+    addPhraseManual(state, { text: String(text).trim(), translations: [] });
   }
   return true;
 }
@@ -893,6 +959,73 @@ export function addKnownLemma(state, lemma) {
   if (state.knowledge.wordLemmas.some((x) => String(x).toLowerCase() === l)) return false;
   state.knowledge.wordLemmas.push(l);
   return true;
+}
+
+/** «Знаю» при импорте — сохраняет карточку с переводами (не только лемму). */
+export function addKnownWordFromImport(state, { lemma, translations = [], forms = [], sources = [] }) {
+  const l = String(lemma ?? "").trim();
+  if (!l) return null;
+
+  addKnownLemma(state, l);
+  const trans = (translations || []).filter(Boolean).slice(0, 3);
+  let word = findWordByLemma(state, l);
+
+  if (word) {
+    word.learned = true;
+    if (trans.length) word.translations = trans;
+    if (forms?.length) {
+      word.forms = [...new Set([...(word.forms || []), ...forms])];
+    }
+  } else {
+    word = makeWord({ lemma: l, translations: trans, forms: forms || [], sources });
+    word.learned = true;
+    state.words.push(word);
+  }
+  return word;
+}
+
+/** «Знаю» для выражения при импорте — сохраняет карточку с переводами. */
+export function addKnownPhraseFromImport(state, { text, translations = [], sources = [] }) {
+  const t = String(text ?? "").trim();
+  if (!t) return null;
+
+  addKnownPhrase(state, t);
+  const trans = (translations || []).filter(Boolean).slice(0, 3);
+  let phrase = findPhraseByText(state, t);
+
+  if (phrase) {
+    phrase.learned = true;
+    if (trans.length) phrase.translations = trans;
+  } else {
+    phrase = makePhrase({ text: t, translations: trans, sources, manual: false });
+    phrase.learned = true;
+    state.phrases.push(phrase);
+  }
+  return phrase;
+}
+
+function repairKnowledgeWordCards(state) {
+  let changed = false;
+
+  for (const lemma of state.knowledge?.wordLemmas || []) {
+    const l = String(lemma).trim();
+    if (!l || findWordByLemma(state, l)) continue;
+    const word = makeWord({ lemma: l, translations: [], sources: [] });
+    word.learned = true;
+    state.words.push(word);
+    changed = true;
+  }
+
+  for (const text of state.knowledge?.phrases || []) {
+    const t = String(text).trim();
+    if (!t || findPhraseByText(state, t)) continue;
+    const phrase = makePhrase({ text: t, translations: [], sources: [], manual: false });
+    phrase.learned = true;
+    state.phrases.push(phrase);
+    changed = true;
+  }
+
+  return changed;
 }
 
 // --- Убрать лемму из Базы знаний (отмена) ---

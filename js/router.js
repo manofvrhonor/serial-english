@@ -1,46 +1,46 @@
-import { renderImport } from "./views/import.js";
-import { renderWords } from "./views/words.js";
-import { renderPhrases } from "./views/phrases.js";
-import { renderTraining } from "./views/training.js";
-import { renderShows } from "./views/shows.js";
-import { renderBooks } from "./views/books.js";
-import { renderKnowledge } from "./views/knowledge.js";
-import { renderSettings } from "./views/settings.js";
+import { renderImport } from "./views/import.js?v=20260624";
+import { renderKnowledge } from "./views/knowledge.js?v=20260624";
+import { renderTraining } from "./views/training.js?v=20260624";
+import { renderShows } from "./views/shows.js?v=20260624";
+import { renderBooks } from "./views/books.js?v=20260624";
+import { renderSettings } from "./views/settings.js?v=20260624";
 
 const routes = {
   import: renderImport,
-  words: renderWords,
-  phrases: renderPhrases,
+  knowledge: renderKnowledge,
   training: renderTraining,
   shows: renderShows,
   books: renderBooks,
-  knowledge: renderKnowledge,
   settings: renderSettings,
+  words: renderKnowledge,
+  phrases: renderKnowledge,
 };
 
 const ROUTE_LABELS = {
   import: "Импорт",
-  words: "Слова",
-  phrases: "Выражения",
+  knowledge: "База знаний",
   training: "Тренировка",
   shows: "Сериалы",
   books: "Книги",
-  knowledge: "База знаний",
   settings: "Настройки",
+  words: "База знаний",
+  phrases: "База знаний",
 };
 
-const MOBILE_PRIMARY = new Set(["import", "words", "training", "shows"]);
+const MOBILE_PRIMARY = new Set(["import", "knowledge", "training", "shows"]);
 
 const content = document.getElementById("content");
 let appCtx = null;
 
 function setActiveNav(route) {
+  const navRoute = route === "words" || route === "phrases" ? "knowledge" : route;
+
   document.querySelectorAll("[data-route]").forEach((el) => {
-    el.classList.toggle("active", el.dataset.route === route);
+    el.classList.toggle("active", el.dataset.route === navRoute);
   });
 
   document.querySelectorAll(".mobile-nav-item[data-action='more']").forEach((el) => {
-    el.classList.toggle("active", !MOBILE_PRIMARY.has(route));
+    el.classList.toggle("active", !MOBILE_PRIMARY.has(navRoute));
   });
 
   const title = document.getElementById("mobile-page-title");
@@ -59,7 +59,7 @@ function closeMobileMore() {
 
 export function navigateTo(route, options = {}) {
   const render = routes[route];
-  if (!render) return;
+  if (!render || !content || !appCtx) return;
 
   if (options.trainingPrep) {
     appCtx.trainingPrep = options.trainingPrep;
@@ -67,9 +67,21 @@ export function navigateTo(route, options = {}) {
     appCtx.trainingPrep = null;
   }
 
-  render(content, appCtx);
-  setActiveNav(route);
-  closeMobileMore();
+  try {
+    render(content, appCtx);
+    setActiveNav(route);
+    closeMobileMore();
+  } catch (err) {
+    console.error(`Route "${route}" failed:`, err);
+    content.innerHTML = `
+      <div class="page">
+        <h1 class="view-title">Ошибка загрузки</h1>
+        <p class="settings-msg settings-msg-err">${esc(String(err?.message || err))}</p>
+        <button type="button" class="btn btn-sm" onclick="location.reload()">Обновить страницу</button>
+      </div>`;
+    setActiveNav(route);
+    closeMobileMore();
+  }
 }
 
 export function startPrepTraining(sourceId, label) {
@@ -79,7 +91,10 @@ export function startPrepTraining(sourceId, label) {
 }
 
 function bindNavItem(el) {
-  el.addEventListener("click", () => navigateTo(el.dataset.route));
+  el.addEventListener("click", () => {
+    if (!el.dataset.route) return;
+    navigateTo(el.dataset.route);
+  });
 }
 
 function initShell() {
@@ -102,4 +117,10 @@ export function initRouter(ctx) {
   appCtx = ctx;
   initShell();
   navigateTo("import");
+}
+
+function esc(s) {
+  return String(s ?? "").replace(/[&<>"']/g, (c) => ({
+    "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;",
+  }[c]));
 }

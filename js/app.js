@@ -1,5 +1,5 @@
-import { loadState, saveState } from "./db/database.js";
-import { initRouter } from "./router.js";
+import { loadState, saveState } from "./db/database.js?v=20260624";
+import { initRouter } from "./router.js?v=20260624";
 
 // Глобальный контекст приложения — живёт в памяти всё время работы
 const ctx = {
@@ -9,17 +9,24 @@ const ctx = {
 };
 
 async function start() {
-  // Загружаем состояние один раз и держим в памяти
-  ctx.state = await loadState();
-
-  // Функция сохранения текущего состояния в БД
-  ctx.save = () => saveState(ctx.state);
-  ctx.reload = async () => { ctx.state = await loadState(); };
-
-  // Передаём контекст в роутер (он раздаст его во view)
-  initRouter(ctx);
-
-  console.log("Serial English: каркас запущен ✔");
+  try {
+    ctx.state = await loadState();
+    ctx.save = () => saveState(ctx.state);
+    ctx.reload = async () => { ctx.state = await loadState(); };
+    initRouter(ctx);
+    console.log("Serial English: каркас запущен ✔");
+  } catch (err) {
+    console.error("Serial English: ошибка запуска", err);
+    const root = document.getElementById("content");
+    if (root) {
+      root.innerHTML = `
+        <div class="page">
+          <h1 class="view-title">Ошибка запуска</h1>
+          <p class="settings-msg settings-msg-err">${String(err?.message || err)}</p>
+          <p class="view-subtitle">Попробуйте обновить страницу (Ctrl+Shift+R).</p>
+        </div>`;
+    }
+  }
 }
 
 start();

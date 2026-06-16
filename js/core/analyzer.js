@@ -1,5 +1,8 @@
 import { tokenize, resolveLemma } from "./lemmatizer.js";
-import { isKnownLemma, isKnownPhrase, isStopWord } from "../db/database.js";
+import {
+  isKnownLemma, isKnownPhrase, isStopWord,
+  isStudyingLemma, isStudyingPhrase,
+} from "../db/database.js";
 
 const MAX_PHRASE_WORDS = 5;
 
@@ -22,14 +25,16 @@ export function analyzeText(state, text, dict = null, formsIndex = null) {
   const result = [];
   for (const [lemma, entry] of map) {
     const known = isKnownLemma(state, lemma);
-    const stop = isStopWord(state, lemma);
+    const stop = !known && isStopWord(state, lemma);
+    const studying = !known && !stop && isStudyingLemma(state, lemma);
     result.push({
       lemma,
       forms: [...entry.forms],
       count: entry.count,
       known,
       stop,
-      included: !known && !stop,
+      studying,
+      included: !known && !stop && !studying,
     });
   }
 
@@ -43,6 +48,7 @@ export function analyzeSummary(words) {
     newCount: words.filter((w) => w.included).length,
     knownCount: words.filter((w) => w.known).length,
     stopCount: words.filter((w) => w.stop).length,
+    studyingCount: words.filter((w) => w.studying).length,
   };
 }
 
@@ -72,12 +78,14 @@ export function analyzePhrases(state, text, dict, formsIndex, phrasesDb) {
   const result = [];
   for (const [text, entry] of counts) {
     const known = isKnownPhrase(state, text);
+    const studying = !known && isStudyingPhrase(state, text);
     result.push({
       text,
       count: entry.count,
       known,
       stop: false,
-      included: !known,
+      studying,
+      included: !known && !studying,
     });
   }
 
@@ -90,5 +98,6 @@ export function phraseSummary(phrases) {
     total: phrases.length,
     newCount: phrases.filter((p) => p.included).length,
     knownCount: phrases.filter((p) => p.known).length,
+    studyingCount: phrases.filter((p) => p.studying).length,
   };
 }

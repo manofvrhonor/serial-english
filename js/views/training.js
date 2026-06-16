@@ -226,24 +226,26 @@ function renderCard(el, ctx) {
 
   const progress = `${session.index + 1} / ${session.entries.length}`;
   const dir = directionLabel(entry.direction);
-  const prepBadge = session.prepLabel
-    ? `<span class="train-prep-badge">${esc(session.prepLabel)}</span>` : "";
+  const prepLine = session.prepLabel
+    ? `<p class="train-prep-line">${esc(session.prepLabel)}</p>` : "";
+
+  const isChoice = mode === 3;
+  const cardClass = isChoice
+    ? "train-card train-card-prompt card card-padded"
+    : `train-card card card-padded${mode === 2 && !session.revealed ? " train-card-clickable" : ""}`;
 
   el.innerHTML = `
-    <div class="page train-page">
-    <div class="train-header">
-      <button id="t-quit" class="btn outline btn-sm train-quit">← Настройки</button>
-      <span class="tag tag-manual">${modeLabel(mode)}</span>
-      <span class="train-progress">${progress}</span>
-      <span class="train-meta">${dir}</span>
-      ${prepBadge}
+    <div class="page train-page train-session">
+    ${renderSessionHeader(mode, progress, dir)}
+    ${prepLine}
+
+    <div class="${cardClass}" id="train-card">
+      ${isChoice ? renderPromptOnly(card) : renderCardBody(card, mode, session.revealed)}
     </div>
 
-    <div class="train-card card card-padded ${mode === 2 && !session.revealed ? "train-card-clickable" : ""}" id="train-card">
-      ${renderCardBody(card, mode, session.revealed)}
-    </div>
+    ${isChoice ? renderOptionsBlock(card, false) : ""}
 
-    <div id="train-actions" class="train-actions ${mode === 3 && session.answered ? "train-actions-single" : ""}">
+    <div id="train-actions" class="train-actions ${isChoice && session.answered ? "train-actions-single" : ""}">
       ${renderActions(card, mode, session.revealed, session.answered)}
     </div>
     </div>
@@ -261,6 +263,22 @@ function renderCard(el, ctx) {
   bindCardEvents(el, ctx);
 }
 
+function renderSessionHeader(mode, progress, dir) {
+  return `
+    <div class="train-session-top">
+      <h1 class="train-page-title">
+        ${ICON_CAP}
+        Тренировка
+      </h1>
+      <div class="train-session-badges">
+        <span class="train-badge train-badge-outline">${esc(modeLabel(mode))}</span>
+        <span class="train-badge train-badge-progress">${progress}</span>
+        <span class="train-badge train-badge-dir">${esc(dir)}</span>
+        <button type="button" id="t-quit" class="btn btn-ghost btn-sm train-quit">Настройки</button>
+      </div>
+    </div>`;
+}
+
 function revealCard(el, ctx) {
   const { mode, card } = session.current;
   session.revealed = true;
@@ -268,6 +286,30 @@ function revealCard(el, ctx) {
   el.querySelector("#train-actions").innerHTML = renderActions(card, mode, true, false);
   el.querySelector("#train-actions").className = "train-actions";
   bindCardEvents(el, ctx);
+}
+
+function renderPromptOnly(card) {
+  return `<div class="train-prompt">${esc(card.prompt)}</div>`;
+}
+
+function renderOptionsBlock(card, answered, feedbackHtml = "") {
+  const options = card.options.map((opt) => {
+    const isCorrect = answered && opt.toLowerCase() === card.answer.toLowerCase();
+    const classes = ["train-option"];
+    if (answered) {
+      if (isCorrect) classes.push("train-option-correct");
+    }
+    return `
+      <button type="button" class="${classes.join(" ")}" data-opt="${escAttr(opt)}" ${answered ? "disabled" : ""}>
+        ${answered && isCorrect ? ICON_CHECK : ""}${esc(opt)}
+      </button>`;
+  }).join("");
+
+  return `
+    <div class="train-options-wrap">
+      <div class="train-options" id="train-options">${options}</div>
+      <div id="train-feedback" class="train-feedback" ${feedbackHtml ? "" : "hidden"}>${feedbackHtml}</div>
+    </div>`;
 }
 
 function renderCardBody(card, mode, revealed) {
@@ -283,17 +325,10 @@ function renderCardBody(card, mode, revealed) {
       <div class="train-reveal-area">
         ${revealed
           ? `<div class="train-answer train-answer-visible">${esc(card.answer)}</div>`
-          : `<button id="t-reveal" class="btn outline train-reveal-btn">Показать</button>`}
+          : `<button type="button" id="t-reveal" class="btn btn-ghost train-reveal-btn">${ICON_EYE}Показать</button>`}
       </div>`;
   }
-  return `
-    <div class="train-prompt">${esc(card.prompt)}</div>
-    <div class="train-options" id="train-options">
-      ${card.options.map((opt) => `
-        <button type="button" class="train-option" data-opt="${escAttr(opt)}">${esc(opt)}</button>
-      `).join("")}
-    </div>
-    <div id="train-feedback" class="train-feedback" hidden></div>`;
+  return renderPromptOnly(card);
 }
 
 function renderActions(card, mode, revealed, answered) {
@@ -301,10 +336,12 @@ function renderActions(card, mode, revealed, answered) {
     if (answered) return `<button id="t-next" class="btn btn-block-row">Дальше</button>`;
     return `<p class="train-hint btn-block-row">Выберите правильный вариант</p>`;
   }
-  if (mode === 2 && !revealed) return `<p class="train-hint btn-block-row">Нажмите на карточку или «Показать»</p>`;
+  if (mode === 2 && !revealed) {
+    return `<p class="train-hint btn-block-row">Нажмите на карточку или «Показать»</p>`;
+  }
   return `
-    <button id="t-unknown" class="btn outline">Не знал</button>
-    <button id="t-knew" class="btn train-knew">Знал</button>`;
+    <button type="button" id="t-unknown" class="btn btn-danger train-action-btn">${ICON_X}Не знал</button>
+    <button type="button" id="t-knew" class="btn train-knew train-action-btn">${ICON_CHECK}Знал</button>`;
 }
 
 function bindCardEvents(el, ctx) {
@@ -327,17 +364,23 @@ function bindCardEvents(el, ctx) {
 
       el.querySelectorAll(".train-option").forEach((b) => {
         b.disabled = true;
-        if (b.dataset.opt.toLowerCase() === card.answer.toLowerCase()) {
+        const isAns = b.dataset.opt.toLowerCase() === card.answer.toLowerCase();
+        const isPicked = b === btn;
+        if (isAns) {
           b.classList.add("train-option-correct");
-        } else if (b === btn && !correct) {
+          if (!b.querySelector(".btn-icon")) {
+            b.insertAdjacentHTML("afterbegin", ICON_CHECK);
+          }
+        } else if (isPicked && !correct) {
           b.classList.add("train-option-wrong");
+          b.insertAdjacentHTML("afterbegin", ICON_X);
         }
       });
 
       const fb = el.querySelector("#train-feedback");
       if (fb) {
         fb.hidden = false;
-        fb.textContent = correct ? "✓ Верно!" : `✗ Правильно: ${card.answer}`;
+        fb.textContent = correct ? "Верно!" : `Правильно: ${card.answer}`;
         fb.className = `train-feedback ${correct ? "train-fb-ok" : "train-fb-bad"}`;
       }
 
@@ -387,19 +430,19 @@ function renderStepDone(el, ctx) {
   const today = getTodayTrainingSummary(ctx.state);
 
   el.innerHTML = `
-    <div class="page">
-    <h1 class="view-title">Шаг ${session.stepNum} завершён</h1>
-    <div class="train-done train-done-batch">
+    <div class="page train-page">
+    <h1 class="view-title train-page-title">${ICON_CAP} Шаг ${session.stepNum} завершён</h1>
+    <div class="card card-padded train-done-card">
       ${session.prepLabel ? `<p class="train-done-source">${esc(session.prepLabel)}</p>` : ""}
-      <p>Карточек: <b>${stats.total}</b></p>
-      <p>Верно: <b class="c-new">${stats.correct}</b> · Ошибок: <b class="c-stop">${stats.wrong}</b></p>
-      <p>Точность: <b>${pct}%</b></p>
+      <p class="train-done-stat">Карточек: <b>${stats.total}</b></p>
+      <p class="train-done-stat">Верно: <b class="c-new">${stats.correct}</b> · Ошибок: <b class="c-stop">${stats.wrong}</b></p>
+      <p class="train-done-stat">Точность: <b>${pct}%</b></p>
       ${more
         ? `<p class="train-queue-hint">Осталось: <b>${stepsLeft}</b> ${stepWord(stepsLeft)}</p>`
         : `<p class="train-queue-hint">Очередь пройдена. Сегодня выполнено шагов: <b>${today.steps}</b></p>`}
       <div class="train-done-actions">
-        ${more ? `<button id="t-next-step" class="btn">Следующий шаг →</button>` : ""}
-        <button id="t-home" class="btn secondary">${more ? "Завершить" : "Готово"}</button>
+        ${more ? `<button type="button" id="t-next-step" class="btn">Следующий шаг →</button>` : ""}
+        <button type="button" id="t-home" class="btn secondary">${more ? "Завершить" : "Готово"}</button>
       </div>
     </div>
     </div>
@@ -412,12 +455,14 @@ function renderStepDone(el, ctx) {
 function renderSessionComplete(el, ctx) {
   const today = getTodayTrainingSummary(ctx.state);
   el.innerHTML = `
-    <div class="page">
-    <h1 class="view-title">Тренировка завершена</h1>
-    <div class="train-done">
-      <p>Сегодня выполнено шагов: <b>${today.steps}</b></p>
-      <p>Карточек: <b>${today.cards}</b> · Точность: <b>${today.accuracy}%</b></p>
-      <button id="t-home" class="btn">К тренировке</button>
+    <div class="page train-page">
+    <h1 class="view-title train-page-title">${ICON_CAP} Тренировка завершена</h1>
+    <div class="card card-padded train-done-card train-done-card-center">
+      <p class="train-done-emoji">🎉</p>
+      <p class="train-done-lead">На сегодня всё!</p>
+      <p class="train-done-stat">Шагов: <b>${today.steps}</b> · Карточек: <b>${today.cards}</b></p>
+      <p class="train-done-stat">Точность: <b>${today.accuracy}%</b></p>
+      <button type="button" id="t-home" class="btn btn-block">К тренировке</button>
     </div>
     </div>
   `;
@@ -457,3 +502,11 @@ function esc(s) {
 function escAttr(s) {
   return String(s ?? "").replace(/"/g, "&quot;");
 }
+
+const ICON_CAP = `<svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M21.42 10.922a1 1 0 0 0-.019-1.838L12.83 5.18a2 2 0 0 0-1.66 0L2.6 9.08a1 1 0 0 0 0 1.832l8.57 3.908a2 2 0 0 0 1.66 0z"/><path d="M22 10v6"/><path d="M6 12.5V16a6 3 0 0 0 12 0v-3.5"/></svg>`;
+
+const ICON_EYE = `<svg class="btn-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z"/><circle cx="12" cy="12" r="3"/></svg>`;
+
+const ICON_CHECK = `<svg class="btn-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M20 6 9 17l-5-5"/></svg>`;
+
+const ICON_X = `<svg class="btn-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>`;

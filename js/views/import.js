@@ -1,7 +1,7 @@
 import { parseFileContent, parseFileName } from "../core/parser.js";
 import { analyzeText, analyzeSummary, analyzePhrases, phraseSummary } from "../core/analyzer.js";
 import {
-  addWords, addPhrases, addStopWord, addKnownLemma, addKnownPhrase,
+  addWords, addPhrases, addStopWord, addKnownWordFromImport, addKnownPhraseFromImport,
   resolveImportSource,
 } from "../db/database.js";
 import { getDictionary, getFormsIndex, translate, translatorUrl } from "../import/dictionary.js";
@@ -11,6 +11,8 @@ import { transChipsHtml, bindTransChipsContainers } from "../ui/trans-chips.js";
 
 let session = null;
 let swipeDetach = null;
+let pendingImportCommit = null;
+let importConfirmModalReady = false;
 
 const defaultUi = () => ({ tab: "words", view: "cards", stackIndex: 0 });
 
@@ -38,6 +40,15 @@ export function renderImport(el, ctx) {
     </div>
   `;
 
+  const resultBox = el.querySelector("#import-result");
+  resultBox.addEventListener("click", (e) => {
+    if (!e.target.closest("#btn-commit")) return;
+    e.preventDefault();
+    if (!session) return;
+    openImportConfirm(el, ctx);
+  });
+
+  ensureImportConfirmModal();
   el.querySelector("#import-file")
     .addEventListener("change", (e) => handleFile(el, ctx, e.target.files?.[0]));
 }
@@ -138,11 +149,11 @@ async function runAnalyze(el, ctx) {
 }
 
 function liveWords() {
-  return session.words.filter((w) => !w.removed);
+  return session.words.filter((w) => !w.removed && w.included);
 }
 
 function livePhrases() {
-  return session.phrases.filter((p) => !p.removed);
+  return session.phrases.filter((p) => !p.removed && p.included);
 }
 
 function renderResult(el, ctx) {
@@ -150,6 +161,7 @@ function renderResult(el, ctx) {
   box.hidden = false;
   const wc = liveWords().length;
   const pc = livePhrases().length;
+  const hasNew = wc > 0 || pc > 0;
   const { tab, view } = session.ui;
 
   box.innerHTML = `
@@ -159,16 +171,17 @@ function renderResult(el, ctx) {
           <button type="button" class="tab-btn ${tab === "words" ? "active" : ""}" data-tab="words">Слова (${wc})</button>
           <button type="button" class="tab-btn ${tab === "phrases" ? "active" : ""}" data-tab="phrases">Фразы (${pc})</button>
         </div>
-        ${tab === "words" ? `
+        ${tab === "words" && wc > 0 ? `
         <div class="tabs">
           <button type="button" class="tab-btn ${view === "cards" ? "active" : ""}" data-view="cards">Карточки</button>
           <button type="button" class="tab-btn ${view === "list" ? "active" : ""}" data-view="list">Список</button>
         </div>` : ""}
       </div>
       <div id="import-panel"></div>
-      <div class="row mt-16">
-        <button id="btn-commit" class="btn">Импортировать выбранные</button>
-      </div>
+      ${hasNew ? `
+      <div class="row mt-16" id="import-commit-row">
+        <button type="button" id="btn-commit" class="btn">Импортировать выбранные</button>
+      </div>` : ""}
       <div id="import-done" class="import-done" hidden></div>
     </div>
   `;
@@ -190,7 +203,78 @@ function renderResult(el, ctx) {
   });
 
   renderPanel(el, ctx);
-  box.querySelector("#btn-commit").addEventListener("click", () => commit(el, ctx));
+}
+
+function ensureImportConfirmModal() {
+  if (importConfirmModalReady) return;
+
+  const modal = document.getElementById("import-confirm-modal");
+  if (!modal) {
+    console.error("import-confirm-modal not found in index.html");
+    return;
+  }
+
+  const close = () => {
+    modal.hidden = true;
+    pendingImportCommit = null;
+  };
+
+  modal.querySelector("#import-confirm-backdrop")?.addEventListener("click", close);
+  modal.querySelector("#import-confirm-edit")?.addEventListener("click", close);
+  modal.querySelector("#import-confirm-ok")?.addEventListener("click", () => {
+    const run = pendingImportCommit;
+    close();
+    if (run) run();
+  });
+
+  importConfirmModalReady = true;
+}
+
+function getChosenItems() {
+  const chosenWords = session.words.filter((w) => w.included && !w.removed);
+  const chosenPhrases = session.phrases.filter((p) => p.included && !p.removed);
+  return { chosenWords, chosenPhrases };
+}
+
+function openImportConfirm(el, ctx) {
+  const { chosenWords, chosenPhrases } = getChosenItems();
+  if (chosenWords.length === 0 && chosenPhrases.length === 0) {
+    alert("Не выбрано ни одного элемента.");
+    return;
+  }
+
+  ensureImportConfirmModal();
+  pendingImportCommit = () => commit(el, ctx);
+
+  const body = document.getElementById("import-confirm-body");
+  if (body) body.innerHTML = buildConfirmBody(chosenWords, chosenPhrases);
+
+  const modal = document.getElementById("import-confirm-modal");
+  if (!modal) return;
+  modal.hidden = false;
+}
+
+function buildConfirmBody(words, phrases) {
+  const wordBlock = words.length
+    ? `
+      <div class="import-confirm-section">
+        <p class="import-confirm-heading">Слова — <strong>${words.length}</strong></p>
+        <ul class="import-confirm-list">${words.map((w) => `<li>${esc(w.lemma)}</li>`).join("")}</ul>
+      </div>`
+    : "";
+
+  const phraseBlock = phrases.length
+    ? `
+      <div class="import-confirm-section">
+        <p class="import-confirm-heading">Выражения — <strong>${phrases.length}</strong></p>
+        <ul class="import-confirm-list">${phrases.map((p) => `<li>${esc(p.text)}</li>`).join("")}</ul>
+      </div>`
+    : "";
+
+  return `
+    <p class="modal-warning">Будет добавлено в базу:</p>
+    ${wordBlock}
+    ${phraseBlock}`;
 }
 
 function renderPanel(el, ctx) {
@@ -223,36 +307,42 @@ function renderPanel(el, ctx) {
 }
 
 function wordStatsHtml() {
-  const live = liveWords();
-  const ws = analyzeSummary(live);
-  const noTrans = live.filter((w) => !resolveTranslations(w).length).length;
+  const ws = analyzeSummary(session.words);
+  const visible = liveWords();
+  const noTrans = visible.filter((w) => !resolveTranslations(w).length).length;
   return `
-    <div class="import-stats">
-      <span class="stat-chip">Всего <strong>${ws.total}</strong></span>
-      <span class="stat-chip stat-chip-success">Новых <strong>${ws.newCount}</strong></span>
-      <span class="stat-chip">Знаю <strong>${ws.knownCount}</strong></span>
-      <span class="stat-chip stat-chip-danger">Стоп <strong>${ws.stopCount}</strong></span>
-      ${noTrans ? `<span class="stat-chip stat-chip-warning">Без перевода <strong>${noTrans}</strong></span>` : ""}
+    <div class="import-stats import-stats-summary">
+      <p class="import-stats-lead">
+        В этом файле <strong>${ws.total}</strong> уникальных слов:
+        знаю <strong>${ws.knownCount}</strong>,
+        в стоп-листе <strong>${ws.stopCount}</strong>,
+        на изучении <strong>${ws.studyingCount}</strong>,
+        новых <strong>${ws.newCount}</strong>.
+      </p>
+      ${noTrans ? `<p class="import-stats-note"><span class="stat-chip stat-chip-warning">Без перевода: ${noTrans}</span></p>` : ""}
     </div>`;
 }
 
 function phraseStatsHtml() {
-  const live = livePhrases();
-  const ps = phraseSummary(live);
-  const noTrans = live.filter((p) => !resolveTranslations(p).length).length;
+  const ps = phraseSummary(session.phrases);
+  const visible = livePhrases();
+  const noTrans = visible.filter((p) => !resolveTranslations(p).length).length;
   return `
-    <div class="import-stats">
-      <span class="stat-chip">Всего <strong>${ps.total}</strong></span>
-      <span class="stat-chip stat-chip-success">Новых <strong>${ps.newCount}</strong></span>
-      <span class="stat-chip">Знаю <strong>${ps.knownCount}</strong></span>
-      ${noTrans ? `<span class="stat-chip stat-chip-warning">Без перевода <strong>${noTrans}</strong></span>` : ""}
+    <div class="import-stats import-stats-summary">
+      <p class="import-stats-lead">
+        В этом файле <strong>${ps.total}</strong> выражений:
+        знаю <strong>${ps.knownCount}</strong>,
+        на изучении <strong>${ps.studyingCount}</strong>,
+        новых <strong>${ps.newCount}</strong>.
+      </p>
+      ${noTrans ? `<p class="import-stats-note"><span class="stat-chip stat-chip-warning">Без перевода: ${noTrans}</span></p>` : ""}
     </div>`;
 }
 
 function renderWordCards(el, ctx) {
   const live = liveWords();
   if (!live.length) {
-    return `<p class="list-empty">Все слова разобраны</p>`;
+    return `<p class="list-empty">Нет новых слов для импорта — все уже знаете, в стоп-листе или на изучении.</p>`;
   }
 
   if (session.ui.stackIndex >= live.length) session.ui.stackIndex = 0;
@@ -327,7 +417,7 @@ function wordAction(el, ctx, i, act) {
 
 function renderWordList(el) {
   const live = liveWords();
-  if (!live.length) return `<p class="list-empty">Нет слов для импорта</p>`;
+  if (!live.length) return `<p class="list-empty">Нет новых слов для импорта.</p>`;
 
   const allIncluded = live.length > 0 && live.every((w) => w.included);
 
@@ -342,9 +432,6 @@ function renderWordList(el) {
 }
 
 function wordRowCard(w, i) {
-  const tag = w.known ? `<span class="tag tag-known">знаю</span>`
-    : w.stop ? `<span class="tag tag-stop">стоп</span>`
-    : `<span class="tag tag-new">новое</span>`;
   const forms = (w.forms || []).slice(0, 5).map((f) => `<span class="chip">${esc(f)}</span>`).join("");
 
   return `
@@ -352,7 +439,7 @@ function wordRowCard(w, i) {
       <div class="import-row-main">
         <input type="checkbox" data-kind="word" data-i="${i}" ${w.included ? "checked" : ""} />
         <div>
-          <div class="import-row-title">${esc(w.lemma)} <span class="import-row-meta">×${w.count}</span> ${tag}</div>
+          <div class="import-row-title">${esc(w.lemma)} <span class="import-row-meta">×${w.count}</span> <span class="tag tag-new">новое</span></div>
           <div>${forms}</div>
         </div>
       </div>
@@ -396,9 +483,14 @@ function bindWordListEvents(el, ctx) {
 }
 
 function renderPhrasesPanel(el) {
+  const ps = phraseSummary(session.phrases);
   const live = livePhrases();
-  if (!live.length) {
+
+  if (ps.total === 0) {
     return `${phraseStatsHtml()}<p class="list-empty">Выражения не найдены</p>`;
+  }
+  if (!live.length) {
+    return `${phraseStatsHtml()}<p class="list-empty">Нет новых выражений для импорта — все уже знаете или на изучении.</p>`;
   }
 
   return `
@@ -409,14 +501,13 @@ function renderPhrasesPanel(el) {
 }
 
 function phraseRowCard(p, i) {
-  const tag = p.known ? `<span class="tag tag-known">знаю</span>` : `<span class="tag tag-new">новое</span>`;
   return `
     <div class="import-row ${p.included ? "" : "row-excluded"}" data-kind="phrase" data-i="${i}">
       <div class="import-row-main">
         <input type="checkbox" data-kind="phrase" data-i="${i}" ${p.included ? "checked" : ""} />
         <div>
           <div class="import-row-title">${esc(p.text)}</div>
-          <div class="import-row-meta">×${p.count} ${tag}</div>
+          <div class="import-row-meta">×${p.count} <span class="tag tag-new">новое</span></div>
         </div>
       </div>
       <div class="import-row-trans">${translationCell(p, i, "phrase")}</div>
@@ -488,8 +579,19 @@ function handleRowAction(el, ctx, btn, kind) {
   if (!item || item.removed) return;
 
   if (act === "known") {
-    if (kind === "word") addKnownLemma(ctx.state, item.lemma);
-    else addKnownPhrase(ctx.state, item.text);
+    const trans = resolveTranslations(item);
+    if (kind === "word") {
+      addKnownWordFromImport(ctx.state, {
+        lemma: item.lemma,
+        translations: trans,
+        forms: item.forms || [],
+      });
+    } else {
+      addKnownPhraseFromImport(ctx.state, {
+        text: item.text,
+        translations: trans,
+      });
+    }
   } else if (act === "stop" && kind === "word") {
     addStopWord(ctx.state, item.lemma);
   }
@@ -524,11 +626,7 @@ function readMetaFields(el, meta) {
 }
 
 function commit(el, ctx) {
-  const chosenWords = session.words.filter((w) => w.included && !w.removed);
-  const chosenPhrases = session.phrases.filter((p) => p.included && !p.removed);
-  if (chosenWords.length === 0 && chosenPhrases.length === 0) {
-    return alert("Не выбрано ни одного элемента.");
-  }
+  const { chosenWords, chosenPhrases } = getChosenItems();
 
   const fields = readMetaFields(el, session.meta);
   const { sourceId, label } = resolveImportSource(ctx.state, session.meta, fields);
@@ -550,13 +648,50 @@ function commit(el, ctx) {
 
   const noTrans = [...chosenWords, ...chosenPhrases].filter((x) => !resolveTranslations(x).length).length;
 
-  const done = el.querySelector("#import-done");
-  done.hidden = false;
-  done.innerHTML = `Импортировано.
-    Слова: <b>+${wordRes.added}</b> / обновлено <b>${wordRes.updated}</b>.
-    Выражения: <b>+${phraseRes.added}</b> / обновлено <b>${phraseRes.updated}</b>.
-    Источник: <b>${esc(label || "—")}</b>
-    ${noTrans ? `<br><span class="c-missing">${noTrans} без перевода — дополните в «Слова» / «Выражения».</span>` : ""}`;
+  session.words = [];
+  session.phrases = [];
+  session.committed = true;
+  renderCommitted(el, ctx, { wordRes, phraseRes, label, noTrans });
+}
+
+function resetImportFileForm(el) {
+  const filename = el.querySelector("#import-filename");
+  if (filename) filename.textContent = ".srt или .txt";
+  const meta = el.querySelector("#import-meta");
+  if (meta) {
+    meta.hidden = true;
+    meta.innerHTML = "";
+  }
+  const fileInput = el.querySelector("#import-file");
+  if (fileInput) fileInput.value = "";
+}
+
+function renderCommitted(el, ctx, { wordRes, phraseRes, label, noTrans }) {
+  const box = el.querySelector("#import-result");
+  if (!box) return;
+
+  resetImportFileForm(el);
+  session = null;
+  swipeDetach = null;
+
+  box.hidden = false;
+  box.innerHTML = `
+    <div class="card card-padded import-section-gap import-committed">
+      <div class="import-done import-done-prominent">
+        Импортировано.
+        Слова: <b>+${wordRes.added}</b> / обновлено <b>${wordRes.updated}</b>.
+        Выражения: <b>+${phraseRes.added}</b> / обновлено <b>${phraseRes.updated}</b>.
+        Источник: <b>${esc(label || "—")}</b>
+        ${noTrans ? `<br><span class="c-missing">${noTrans} без перевода — дополните в «База знаний → На изучении».</span>` : ""}
+      </div>
+      <button type="button" class="btn btn-sm secondary mt-16" id="btn-new-import">Загрузить другой файл</button>
+    </div>`;
+
+  box.querySelector("#btn-new-import")?.addEventListener("click", () => {
+    resetImportFileForm(el);
+    box.hidden = true;
+    box.innerHTML = "";
+  });
 }
 
 function showError(el, msg) {
@@ -570,3 +705,5 @@ function esc(s) {
     "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;",
   }[c]));
 }
+
+ensureImportConfirmModal();
