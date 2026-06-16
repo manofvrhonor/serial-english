@@ -10,7 +10,7 @@ export function renderSettings(el, ctx) {
 
   el.innerHTML = `
     <div class="page settings-page">
-    <h1 class="view-title">Настройки</h1>
+    <h1 class="view-title view-title-section">Настройки</h1>
     <p class="view-subtitle">Интервалы SRS, экспорт и импорт данных.</p>
 
     <div class="settings-stack">

@@ -1,11 +1,15 @@
 import {
-  resolveSourceLabel,
   addWordManual,
   updateWord,
   deleteWord,
   markWordLearned,
 } from "../db/database.js";
 import { transChipsHtml, bindTransChipsContainers } from "../ui/trans-chips.js";
+import { openSourcesModal } from "../ui/sources-modal.js";
+
+const ICON_SOURCES = `<svg class="btn-icon-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M3 5h.01"/><path d="M3 12h.01"/><path d="M3 19h.01"/><path d="M8 5h13"/><path d="M8 12h13"/><path d="M8 19h13"/></svg>`;
+
+import { bindScrollTop } from "../ui/scroll-top.js";
 
 export function mountWordsPanel(mountEl, ctx, options = {}) {
   const panel = { query: options.query ?? "" };
@@ -23,11 +27,13 @@ export function mountWordsPanel(mountEl, ctx, options = {}) {
       </div>
       <div class="card list-card">
         <div class="list-table-wrap">
-          <table class="list-table">
+          <table class="list-table list-table-compact">
             <thead><tr>
-              <th>Слово</th><th>Переводы</th><th>Источники</th><th>SRS</th><th></th>
+              <th class="col-word">Слово</th>
+              <th class="col-trans-cell">Переводы</th>
+              <th class="col-actions"></th>
             </tr></thead>
-            <tbody id="${prefix}-tbody">${words.map((w) => rowHtml(w, ctx)).join("") || emptyRow()}</tbody>
+            <tbody id="${prefix}-tbody">${words.map((w) => rowHtml(w)).join("") || emptyRow()}</tbody>
           </table>
         </div>
       </div>`;
@@ -53,6 +59,8 @@ export function mountWordsPanel(mountEl, ctx, options = {}) {
       options.onChange?.();
       draw();
     });
+
+    bindScrollTop();
   }
 
   draw();
@@ -88,29 +96,22 @@ function getFilteredWords(state, q) {
   }).sort((a, b) => a.lemma.localeCompare(b.lemma));
 }
 
-function srsLabel(w) {
-  const en = w.srs?.enru?.level ?? 0;
-  const ru = w.srs?.ruen?.level ?? 0;
-  return `EN→RU: ${en} · RU→EN: ${ru}`;
-}
+function rowHtml(w) {
+  const sourceCount = (w.sources || []).length;
+  const sourcesTitle = sourceCount
+    ? `Источники (${sourceCount})`
+    : "Нет источников";
 
-function sourcesLabel(state, w) {
-  const ids = w.sources || [];
-  if (!ids.length) return "—";
-  if (ids.length === 1) return esc(resolveSourceLabel(state, ids[0]));
-  return `${ids.length} источн.`;
-}
-
-function rowHtml(w, ctx) {
   return `
     <tr data-id="${w.id}">
-      <td><strong>${esc(w.lemma)}</strong><br><span class="tag tag-new">изучаю</span></td>
+      <td class="col-word"><strong>${esc(w.lemma)}</strong><br><span class="tag tag-new">изучаю</span></td>
       <td class="col-trans-cell">${transChipsHtml(w.translations || [], { id: w.id })}</td>
-      <td class="col-sources">${sourcesLabel(ctx.state, w)}</td>
-      <td class="col-srs">${srsLabel(w)}</td>
       <td class="col-actions">
-        <button type="button" class="btn outline btn-sm" data-act="learn" data-id="${w.id}" title="Выучено">✓</button>
-        <button type="button" class="btn outline btn-sm btn-icon-danger" data-act="delete" data-id="${w.id}" title="Удалить слово">✕</button>
+        <div class="row-actions">
+          <button type="button" class="btn outline btn-sm btn-icon-only" data-act="learn" data-id="${w.id}" title="Выучено">✓</button>
+          <button type="button" class="btn outline btn-sm btn-icon-only btn-icon-danger" data-act="delete" data-id="${w.id}" title="Удалить слово">✕</button>
+          <button type="button" class="btn outline btn-sm btn-icon-only" data-act="sources" data-id="${w.id}" title="${escAttr(sourcesTitle)}" ${sourceCount ? "" : "disabled"}>${ICON_SOURCES}</button>
+        </div>
       </td>
     </tr>`;
 }
@@ -128,17 +129,27 @@ function bindActions(el, ctx, prefix, onDone) {
       const id = btn.dataset.id;
       if (btn.dataset.act === "learn") {
         markWordLearned(ctx.state, id);
+        ctx.save();
+        onDone();
       } else if (btn.dataset.act === "delete") {
         deleteWord(ctx.state, id);
+        ctx.save();
+        onDone();
+      } else if (btn.dataset.act === "sources") {
+        const word = ctx.state.words.find((w) => w.id === id);
+        if (!word) return;
+        openSourcesModal(ctx.state, word.sources, word.lemma);
       }
-      ctx.save();
-      onDone();
     });
   });
 }
 
 function emptyRow() {
-  return `<tr><td colspan="5" class="empty-row">Список пуст</td></tr>`;
+  return `<tr><td colspan="3" class="empty-row">Список пуст</td></tr>`;
+}
+
+function escAttr(s) {
+  return String(s ?? "").replace(/"/g, "&quot;");
 }
 
 function esc(s) {

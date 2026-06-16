@@ -597,6 +597,32 @@ export function resolveSourceLabel(state, sourceId) {
   return sourceId;
 }
 
+/** Краткая метка для списка источников: «Сериал · S01E01» / «Книга · гл.3» */
+export function formatSourceShort(state, sourceId) {
+  if (!sourceId) return null;
+
+  for (const show of state.shows || []) {
+    for (const season of show.seasons || []) {
+      for (const ep of season.episodes || []) {
+        if (ep.id === sourceId) {
+          const code = `S${String(season.number).padStart(2, "0")}E${String(ep.number).padStart(2, "0")}`;
+          return `${show.title} · ${code}`;
+        }
+      }
+    }
+  }
+
+  for (const book of state.books || []) {
+    for (const ch of book.chapters || []) {
+      if (ch.id === sourceId) {
+        return `${book.title} · гл.${ch.number}`;
+      }
+    }
+  }
+
+  return sourceId;
+}
+
 // ===================================================================
 //  CRUD: СЛОВА И ВЫРАЖЕНИЯ (Этап 4)
 // ===================================================================

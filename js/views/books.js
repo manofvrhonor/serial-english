@@ -7,7 +7,7 @@ export function renderBooks(el, ctx) {
   if (!books.length) {
     el.innerHTML = `
       <div class="page">
-      <h1 class="view-title">Книги</h1>
+      <h1 class="view-title view-title-section">Книги</h1>
       <p class="view-subtitle">Вложенность: Книга → Глава.</p>
       <div class="card card-padded list-empty">
         Пока нет книг. Импортируйте файл <b>.txt</b> в разделе «Импорт» —
@@ -21,7 +21,7 @@ export function renderBooks(el, ctx) {
 
   el.innerHTML = `
     <div class="page">
-    <h1 class="view-title">Книги</h1>
+    <h1 class="view-title view-title-section">Книги</h1>
     <p class="view-subtitle">Готовность = выученные / все слова и выражения главы.</p>
     <div class="source-cards">${cards}</div>
     </div>`;

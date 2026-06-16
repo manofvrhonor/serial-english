@@ -7,7 +7,7 @@ export function renderShows(el, ctx) {
   if (!shows.length) {
     el.innerHTML = `
       <div class="page">
-      <h1 class="view-title">Сериалы</h1>
+      <h1 class="view-title view-title-section">Сериалы</h1>
       <p class="view-subtitle">Вложенность: Сериал → Сезон → Серия.</p>
       <div class="card card-padded list-empty">
         Пока нет сериалов. Импортируйте файл <b>.srt</b> в разделе «Импорт» —
@@ -21,7 +21,7 @@ export function renderShows(el, ctx) {
 
   el.innerHTML = `
     <div class="page">
-    <h1 class="view-title">Сериалы</h1>
+    <h1 class="view-title view-title-section">Сериалы</h1>
     <p class="view-subtitle">Готовность = выученные / все слова и выражения серии.</p>
     <div class="source-cards">${cards}</div>
     </div>`;

@@ -1,9 +1,10 @@
-import { renderImport } from "./views/import.js?v=20260624";
-import { renderKnowledge } from "./views/knowledge.js?v=20260624";
-import { renderTraining } from "./views/training.js?v=20260624";
-import { renderShows } from "./views/shows.js?v=20260624";
-import { renderBooks } from "./views/books.js?v=20260624";
-import { renderSettings } from "./views/settings.js?v=20260624";
+import { renderImport } from "./views/import.js?v=20260630";
+import { renderKnowledge } from "./views/knowledge.js?v=20260630";
+import { renderTraining } from "./views/training.js?v=20260630";
+import { renderShows } from "./views/shows.js?v=20260630";
+import { renderBooks } from "./views/books.js?v=20260630";
+import { renderSettings } from "./views/settings.js?v=20260630";
+import { refreshPageScrollTop } from "./ui/scroll-top.js?v=20260630";
 
 const routes = {
   import: renderImport,
@@ -16,19 +17,6 @@ const routes = {
   phrases: renderKnowledge,
 };
 
-const ROUTE_LABELS = {
-  import: "Импорт",
-  knowledge: "База знаний",
-  training: "Тренировка",
-  shows: "Сериалы",
-  books: "Книги",
-  settings: "Настройки",
-  words: "База знаний",
-  phrases: "База знаний",
-};
-
-const MOBILE_PRIMARY = new Set(["import", "knowledge", "training", "shows"]);
-
 const content = document.getElementById("content");
 let appCtx = null;
 
@@ -38,23 +26,6 @@ function setActiveNav(route) {
   document.querySelectorAll("[data-route]").forEach((el) => {
     el.classList.toggle("active", el.dataset.route === navRoute);
   });
-
-  document.querySelectorAll(".mobile-nav-item[data-action='more']").forEach((el) => {
-    el.classList.toggle("active", !MOBILE_PRIMARY.has(navRoute));
-  });
-
-  const title = document.getElementById("mobile-page-title");
-  if (title) title.textContent = ROUTE_LABELS[route] || "Serial English";
-}
-
-function openMobileMore() {
-  const sheet = document.getElementById("mobile-more");
-  if (sheet) sheet.hidden = false;
-}
-
-function closeMobileMore() {
-  const sheet = document.getElementById("mobile-more");
-  if (sheet) sheet.hidden = true;
 }
 
 export function navigateTo(route, options = {}) {
@@ -70,7 +41,7 @@ export function navigateTo(route, options = {}) {
   try {
     render(content, appCtx);
     setActiveNav(route);
-    closeMobileMore();
+    refreshPageScrollTop(route);
   } catch (err) {
     console.error(`Route "${route}" failed:`, err);
     content.innerHTML = `
@@ -80,7 +51,7 @@ export function navigateTo(route, options = {}) {
         <button type="button" class="btn btn-sm" onclick="location.reload()">Обновить страницу</button>
       </div>`;
     setActiveNav(route);
-    closeMobileMore();
+    refreshPageScrollTop(route);
   }
 }
 
@@ -100,13 +71,6 @@ function bindNavItem(el) {
 function initShell() {
   document.querySelectorAll(".menu-item[data-route]").forEach(bindNavItem);
   document.querySelectorAll(".mobile-nav-item[data-route]").forEach(bindNavItem);
-  document.querySelectorAll(".mobile-more-item[data-route]").forEach(bindNavItem);
-
-  document.querySelectorAll(".mobile-nav-item[data-action='more']").forEach((btn) => {
-    btn.addEventListener("click", openMobileMore);
-  });
-
-  document.getElementById("mobile-more-backdrop")?.addEventListener("click", closeMobileMore);
 
   document.getElementById("sidebar-toggle")?.addEventListener("click", () => {
     document.getElementById("app")?.classList.toggle("sidebar-collapsed");

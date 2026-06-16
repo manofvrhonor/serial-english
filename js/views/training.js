@@ -8,6 +8,7 @@ import {
   stepsInQueue,
   stepsRemaining,
 } from "../db/database.js";
+import { bindScrollTop } from "../ui/scroll-top.js";
 
 const STEP_SIZE = 10;
 
@@ -63,7 +64,7 @@ function renderSetup(el, ctx) {
 
   el.innerHTML = `
     <div class="page train-page">
-      <h1 class="view-title train-page-title">
+      <h1 class="view-title view-title-section train-page-title">
         <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
           <path d="M21.42 10.922a1 1 0 0 0-.019-1.838L12.83 5.18a2 2 0 0 0-1.66 0L2.6 9.08a1 1 0 0 0 0 1.832l8.57 3.908a2 2 0 0 0 1.66 0z"/>
           <path d="M22 10v6"/><path d="M6 12.5V16a6 3 0 0 0 12 0v-3.5"/>
@@ -164,6 +165,8 @@ function renderSetup(el, ctx) {
       dueOnly: setup.dueOnly,
     });
   });
+
+  bindScrollTop();
 }
 
 function startSession(el, ctx, opts, fromPrep = false) {
@@ -450,6 +453,7 @@ function renderStepDone(el, ctx) {
 
   el.querySelector("#t-next-step")?.addEventListener("click", () => startNextStep(el, ctx));
   el.querySelector("#t-home").addEventListener("click", () => renderSetup(el, ctx));
+  bindScrollTop();
 }
 
 function renderSessionComplete(el, ctx) {
@@ -467,6 +471,7 @@ function renderSessionComplete(el, ctx) {
     </div>
   `;
   el.querySelector("#t-home").addEventListener("click", () => renderSetup(el, ctx));
+  bindScrollTop();
 }
 
 function stepWord(n) {

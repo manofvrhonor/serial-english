@@ -16,6 +16,7 @@ import { getDictionary, translate } from "../import/dictionary.js";
 import { getPhrases, translatePhrase } from "../import/phrases.js";
 import { mountWordsPanel } from "./study-words.js";
 import { mountPhrasesPanel } from "./study-phrases.js";
+import { bindScrollTop } from "../ui/scroll-top.js";
 
 let section = "studying";
 let subTab = "words";
@@ -50,7 +51,7 @@ function draw(el, ctx) {
 
   el.innerHTML = `
     <div class="page">
-    <h1 class="view-title">База знаний</h1>
+    <h1 class="view-title view-title-section">База знаний</h1>
     <p class="view-subtitle">Слова и выражения, выученное, стоп-лист и статистика.</p>
 
     <section class="card card-padded settings-card kb-stats">
@@ -131,6 +132,8 @@ function draw(el, ctx) {
     content.innerHTML = stopListTable(stopWords);
     bindStopListActions(el, ctx);
   }
+
+  bindScrollTop();
 }
 
 function mountStudying(content, ctx, rootEl) {

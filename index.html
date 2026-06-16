@@ -6,7 +6,7 @@
   <meta name="theme-color" content="#0f172a" />
   <meta name="description" content="Оффлайн-приложение для изучения английского по сериалам и книгам." />
   <title>Serial English</title>
-  <link rel="stylesheet" href="css/styles.css?v=20260624" />
+  <link rel="stylesheet" href="css/styles.css?v=20260630" />
 </head>
 <body>
   <div class="app" id="app">
@@ -54,9 +54,6 @@
         </button>
         <span class="header-subtitle">Оффлайн словарь</span>
       </header>
-      <header class="app-header mobile-header">
-        <span class="header-title" id="mobile-page-title">Serial English</span>
-      </header>
 
       <main class="content" id="content"></main>
     </div>
@@ -76,24 +73,18 @@
         <span>Тренировка</span>
       </button>
       <button class="mobile-nav-item" data-route="shows" type="button">
-        <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m16 6 4 14"/><path d="M12 6v14"/><path d="M8 8v12"/><path d="M4 4v16"/></svg>
+        <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect width="20" height="15" x="2" y="7" rx="2" ry="2"/><polyline points="17 2 12 7 7 2"/></svg>
         <span>Сериалы</span>
       </button>
-      <button class="mobile-nav-item" data-action="more" type="button">
-        <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/><circle cx="5" cy="12" r="1"/></svg>
-        <span>Ещё</span>
+      <button class="mobile-nav-item" data-route="books" type="button">
+        <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 19.5v-15A2.5 2.5 0 0 1 6.5 2H19a1 1 0 0 1 1 1v18a1 1 0 0 1-1 1H6.5a1 1 0 0 1 0-5H20"/></svg>
+        <span>Книги</span>
+      </button>
+      <button class="mobile-nav-item" data-route="settings" type="button">
+        <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"/><circle cx="12" cy="12" r="3"/></svg>
+        <span>Настройки</span>
       </button>
     </nav>
-
-    <!-- Доп. разделы на mobile -->
-    <div class="mobile-more" id="mobile-more" hidden>
-      <div class="mobile-more-backdrop" id="mobile-more-backdrop"></div>
-      <div class="mobile-more-sheet" role="dialog" aria-label="Дополнительные разделы">
-        <div class="mobile-more-title">Разделы</div>
-        <button class="mobile-more-item" data-route="books" type="button">Книги</button>
-        <button class="mobile-more-item" data-route="settings" type="button">Настройки</button>
-      </div>
-    </div>
   </div>
 
   <div class="modal" id="import-confirm-modal" hidden>
@@ -108,6 +99,6 @@
     </div>
   </div>
 
-  <script type="module" src="js/app.js?v=20260624"></script>
+  <script type="module" src="js/app.js?v=20260630"></script>
 </body>
 </html>

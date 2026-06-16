@@ -8,6 +8,7 @@ import { getDictionary, getFormsIndex, translate, translatorUrl } from "../impor
 import { getPhrases, translatePhrase } from "../import/phrases.js";
 import { attachSwipeCard } from "../ui/swipe-card.js";
 import { transChipsHtml, bindTransChipsContainers } from "../ui/trans-chips.js";
+import { refreshPageScrollTop, unbindScrollTop } from "../ui/scroll-top.js";
 
 let session = null;
 let swipeDetach = null;
@@ -21,8 +22,8 @@ export function renderImport(el, ctx) {
   swipeDetach = null;
 
   el.innerHTML = `
-    <div class="page">
-      <h1 class="view-title">Импорт текста</h1>
+    <div class="page import-page">
+      <h1 class="view-title view-title-section">Импорт текста</h1>
       <p class="view-subtitle">Загрузите субтитры (.srt) или текст главы (.txt).</p>
 
       <div class="card card-padded">
@@ -85,16 +86,20 @@ function renderMeta(el, ctx, meta, text) {
   const preview = text.length > 300 ? text.slice(0, 300) + "…" : text;
 
   const fields = meta.kind === "srt" ? `
-    <div class="form-grid">
-      <label class="field-label">Сериал<input type="text" id="m-show" value="${esc(meta.show)}" /></label>
-      <label class="field-label">Сезон<input type="number" id="m-season" value="${meta.season ?? ""}" min="0" /></label>
-      <label class="field-label">Серия<input type="number" id="m-episode" value="${meta.episode ?? ""}" min="0" /></label>
-      <label class="field-label">Название серии<input type="text" id="m-eptitle" value="${esc(meta.episodeTitle)}" /></label>
+    <div class="form-grid form-grid-show">
+      <label class="field-label field-full">Сериал<input type="text" id="m-show" value="${esc(meta.show)}" /></label>
+      <div class="field-row-compact">
+        <label class="field-label field-num">Сезон<input type="number" id="m-season" class="input-num" value="${meta.season ?? ""}" min="0" /></label>
+        <label class="field-label field-num">Серия<input type="number" id="m-episode" class="input-num" value="${meta.episode ?? ""}" min="0" /></label>
+      </div>
+      <label class="field-label field-full">Название серии<input type="text" id="m-eptitle" value="${esc(meta.episodeTitle)}" /></label>
     </div>` : `
-    <div class="form-grid">
-      <label class="field-label">Книга<input type="text" id="m-book" value="${esc(meta.book)}" /></label>
-      <label class="field-label">Глава<input type="number" id="m-chapter" value="${meta.chapter ?? ""}" min="0" /></label>
-      <label class="field-label">Название главы<input type="text" id="m-chtitle" value="${esc(meta.chapterTitle)}" /></label>
+    <div class="form-grid form-grid-book">
+      <label class="field-label field-full">Книга<input type="text" id="m-book" value="${esc(meta.book)}" /></label>
+      <div class="field-row-compact">
+        <label class="field-label field-num">Глава<input type="number" id="m-chapter" class="input-num" value="${meta.chapter ?? ""}" min="0" /></label>
+      </div>
+      <label class="field-label field-full">Название главы<input type="text" id="m-chtitle" value="${esc(meta.chapterTitle)}" /></label>
     </div>`;
 
   box.innerHTML = `
@@ -203,6 +208,7 @@ function renderResult(el, ctx) {
   });
 
   renderPanel(el, ctx);
+  refreshPageScrollTop("import");
 }
 
 function ensureImportConfirmModal() {
@@ -288,10 +294,10 @@ function renderPanel(el, ctx) {
 
   if (session.ui.tab === "phrases") {
     panel.innerHTML = renderPhrasesPanel(el);
-  bindPhraseEvents(el, ctx);
-  bindImportTransChips(el);
-  return;
-}
+    bindPhraseEvents(el, ctx);
+    bindImportTransChips(el);
+    return;
+  }
 
   panel.innerHTML = `
     ${wordStatsHtml()}
@@ -673,6 +679,7 @@ function renderCommitted(el, ctx, { wordRes, phraseRes, label, noTrans }) {
   resetImportFileForm(el);
   session = null;
   swipeDetach = null;
+  unbindScrollTop();
 
   box.hidden = false;
   box.innerHTML = `
