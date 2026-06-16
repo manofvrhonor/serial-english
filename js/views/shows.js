@@ -9,7 +9,7 @@ export function renderShows(el, ctx) {
       <div class="page">
       <h1 class="view-title">Сериалы</h1>
       <p class="view-subtitle">Вложенность: Сериал → Сезон → Серия.</p>
-      <div class="placeholder">
+      <div class="card card-padded list-empty">
         Пока нет сериалов. Импортируйте файл <b>.srt</b> в разделе «Импорт» —
         сериал, сезон и серия создадутся автоматически.
       </div>
@@ -17,13 +17,13 @@ export function renderShows(el, ctx) {
     return;
   }
 
-  const tree = shows.map((show) => renderShow(ctx, show)).join("");
+  const cards = shows.map((show) => renderShowCard(ctx, show)).join("");
 
   el.innerHTML = `
     <div class="page">
     <h1 class="view-title">Сериалы</h1>
     <p class="view-subtitle">Готовность = выученные / все слова и выражения серии.</p>
-    <div class="tree">${tree}</div>
+    <div class="source-cards">${cards}</div>
     </div>`;
 
   el.querySelectorAll(".tree-prep-btn").forEach((btn) => {
@@ -34,7 +34,7 @@ export function renderShows(el, ctx) {
   });
 }
 
-function renderShow(ctx, show) {
+function renderShowCard(ctx, show) {
   const epIds = [];
   for (const season of show.seasons || []) {
     for (const ep of season.episodes || []) epIds.push(ep.id);
@@ -44,57 +44,53 @@ function renderShow(ctx, show) {
   const seasons = (show.seasons || [])
     .slice()
     .sort((a, b) => a.number - b.number)
-    .map((s) => renderSeason(ctx, show, s))
+    .map((s) => renderSeasonBlock(ctx, show, s))
     .join("");
 
   return `
-    <details class="tree-block" open>
-      <summary class="tree-summary tree-level-show">
-        <span class="tree-icon">📺</span>
-        <span class="tree-name">${esc(show.title)}</span>
-        ${progressBarHtml(readiness, true)}
-      </summary>
-      <div class="tree-children">${seasons || `<div class="tree-empty">Нет сезонов</div>`}</div>
-    </details>`;
+    <article class="card card-padded source-card">
+      <div class="source-card-header">
+        <span class="source-card-icon" aria-hidden="true">📺</span>
+        <h2 class="source-card-title">${esc(show.title)}</h2>
+        <span class="source-badge">${readiness.learned}/${readiness.total} изучено</span>
+      </div>
+      ${progressBarHtml(readiness, true)}
+      <div class="source-body">${seasons || `<p class="source-empty">Нет сезонов</p>`}</div>
+    </article>`;
 }
 
-function renderSeason(ctx, show, season) {
-  const epIds = (season.episodes || []).map((e) => e.id);
-  const readiness = calcReadinessForSources(ctx.state, epIds);
-
+function renderSeasonBlock(ctx, show, season) {
   const episodes = (season.episodes || [])
     .slice()
     .sort((a, b) => a.number - b.number)
-    .map((ep) => renderEpisode(ctx, show, season, ep))
+    .map((ep) => renderEpisodeCard(ctx, show, season, ep))
     .join("");
 
   return `
-    <details class="tree-block">
-      <summary class="tree-summary tree-level-season">
-        <span class="tree-icon">📂</span>
-        <span class="tree-name">Сезон ${season.number}</span>
-        ${progressBarHtml(readiness, true)}
-      </summary>
-      <div class="tree-children">${episodes || `<div class="tree-empty">Нет серий</div>`}</div>
-    </details>`;
+    <div class="source-season">
+      <div class="source-season-label">Сезон ${season.number}</div>
+      <div class="source-ep-grid">${episodes || `<p class="source-empty">Нет серий</p>`}</div>
+    </div>`;
 }
 
-function renderEpisode(ctx, show, season, ep) {
+function renderEpisodeCard(ctx, show, season, ep) {
   const readiness = calcReadiness(ctx.state, ep.id);
   const label = episodeLabel(season, ep);
   const fullLabel = `${show.title} · ${label}`;
   const canPrep = readiness.unlearned > 0;
 
   return `
-    <div class="tree-leaf tree-episode">
-      <div class="tree-leaf-main">
-        <span class="tree-icon">🎬</span>
-        <span class="tree-name">${esc(label)}</span>
-        ${progressBarHtml(readiness)}
+    <div class="source-ep-card">
+      <div class="source-ep-head">
+        <span class="source-ep-label">${esc(label)}</span>
+        <span class="source-ep-count">${readiness.learned}/${readiness.total}</span>
       </div>
-      <button class="btn btn-sm tree-prep-btn" data-source="${escAttr(ep.id)}" data-label="${escAttr(fullLabel)}"
+      <div class="prog-bar prog-bar-thin" title="${readiness.learned} из ${readiness.total}">
+        <div class="prog-fill" style="width:${readiness.percent}%"></div>
+      </div>
+      <button type="button" class="btn btn-sm tree-prep-btn source-prep-btn" data-source="${escAttr(ep.id)}" data-label="${escAttr(fullLabel)}"
         ${canPrep ? "" : "disabled title=\"Всё выучено\""}>
-        🎯 Подготовка к просмотру
+        Подготовка к просмотру
       </button>
     </div>`;
 }

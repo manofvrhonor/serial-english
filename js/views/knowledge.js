@@ -8,15 +8,18 @@ import {
 } from "../db/database.js";
 
 let query = "";
+let tab = "words";
 
 export function renderKnowledge(el, ctx) {
   query = "";
+  tab = "words";
   draw(el, ctx);
 }
 
 function draw(el, ctx) {
   const words = filterItems(getKnowledgeWords(ctx.state), query, (x) => x.lemma);
   const phrases = filterItems(getKnowledgePhrases(ctx.state), query, (x) => x.text);
+  const activeCount = tab === "words" ? words.length : phrases.length;
 
   el.innerHTML = `
     <div class="page">
@@ -26,30 +29,19 @@ function draw(el, ctx) {
     <div class="list-toolbar">
       <input type="search" id="k-search" class="list-search"
         placeholder="Поиск по слову, выражению или переводу…" value="${esc(query)}" />
+      <div class="tabs" id="k-tabs">
+        <button type="button" class="tab-btn${tab === "words" ? " active" : ""}" data-tab="words">Слова</button>
+        <button type="button" class="tab-btn${tab === "phrases" ? " active" : ""}" data-tab="phrases">Выражения</button>
+      </div>
     </div>
 
     <div class="list-summary">
-      Слов: <b>${words.length}</b> · Выражений: <b>${phrases.length}</b>
+      ${tab === "words" ? "Слов" : "Выражений"}: <b>${activeCount}</b>
+      · всего слов <b>${words.length}</b> · выражений <b>${phrases.length}</b>
     </div>
 
-    <h2 class="import-section-title">Слова</h2>
-    <div class="list-table-wrap">
-      <table class="list-table">
-        <thead><tr>
-          <th>Лемма</th><th>Переводы</th><th>Статус</th><th>Действия</th>
-        </tr></thead>
-        <tbody id="k-words">${words.map((w) => wordRow(w)).join("") || emptyRow(4)}</tbody>
-      </table>
-    </div>
-
-    <h2 class="import-section-title import-section-gap">Выражения</h2>
-    <div class="list-table-wrap">
-      <table class="list-table">
-        <thead><tr>
-          <th>Выражение</th><th>Переводы</th><th>Действия</th>
-        </tr></thead>
-        <tbody id="k-phrases">${phrases.map((p) => phraseRow(p)).join("") || emptyRow(3)}</tbody>
-      </table>
+    <div class="card list-card">
+      ${tab === "words" ? wordsTable(words) : phrasesTable(phrases)}
     </div>
     </div>
   `;
@@ -59,7 +51,44 @@ function draw(el, ctx) {
     draw(el, ctx);
   });
 
+  el.querySelectorAll("#k-tabs .tab-btn").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      tab = btn.dataset.tab;
+      draw(el, ctx);
+    });
+  });
+
   bindActions(el, ctx);
+}
+
+function wordsTable(words) {
+  if (!words.length) {
+    return `<div class="list-empty">Список слов пуст</div>`;
+  }
+  return `
+    <div class="list-table-wrap">
+      <table class="list-table">
+        <thead><tr>
+          <th>Лемма</th><th>Переводы</th><th></th>
+        </tr></thead>
+        <tbody id="k-words">${words.map((w) => wordRow(w)).join("")}</tbody>
+      </table>
+    </div>`;
+}
+
+function phrasesTable(phrases) {
+  if (!phrases.length) {
+    return `<div class="list-empty">Список выражений пуст</div>`;
+  }
+  return `
+    <div class="list-table-wrap">
+      <table class="list-table">
+        <thead><tr>
+          <th>Выражение</th><th>Переводы</th><th></th>
+        </tr></thead>
+        <tbody id="k-phrases">${phrases.map((p) => phraseRow(p)).join("")}</tbody>
+      </table>
+    </div>`;
 }
 
 function filterItems(items, q, getKey) {
@@ -88,11 +117,10 @@ function wordRow(entry) {
     <tr data-lemma="${escAttr(lemma)}">
       <td><strong>${esc(lemma)}</strong><br>${status} ${inCards}</td>
       <td class="col-trans-cell">${esc(trans)}</td>
-      <td>${inStopList ? "Не импортировать" : "Исключено из импорта"}</td>
       <td class="col-actions">
-        ${word ? `<button class="row-btn" data-act="return-word" data-lemma="${escAttr(lemma)}">↩ В изучение</button>` : ""}
-        <button class="row-btn row-btn-stop" data-act="exclude-word" data-lemma="${escAttr(lemma)}"
-          ${inStopList ? "disabled" : ""}>🚫 В стоп-лист</button>
+        ${word ? `<button type="button" class="btn outline btn-sm" data-act="return-word" data-lemma="${escAttr(lemma)}" title="Вернуть в изучение">↩</button>` : ""}
+        <button type="button" class="btn outline btn-sm btn-icon-danger" data-act="exclude-word" data-lemma="${escAttr(lemma)}"
+          title="В стоп-лист" ${inStopList ? "disabled" : ""}>🚫</button>
       </td>
     </tr>`;
 }
@@ -109,9 +137,9 @@ function phraseRow(entry) {
         ${phrase ? `<span class="tag tag-manual">в карточках</span>` : ""}</td>
       <td class="col-trans-cell">${esc(trans)}</td>
       <td class="col-actions">
-        ${phrase ? `<button class="row-btn" data-act="return-phrase" data-text="${escAttr(text)}">↩ В изучение</button>` : ""}
-        <button class="row-btn row-btn-stop" data-act="exclude-phrase" data-text="${escAttr(text)}"
-          title="Не предлагать при импорте">🚫 Исключить</button>
+        ${phrase ? `<button type="button" class="btn outline btn-sm" data-act="return-phrase" data-text="${escAttr(text)}" title="Вернуть в изучение">↩</button>` : ""}
+        <button type="button" class="btn outline btn-sm btn-icon-danger" data-act="exclude-phrase" data-text="${escAttr(text)}"
+          title="Исключить из импорта">🚫</button>
       </td>
     </tr>`;
 }
@@ -139,10 +167,6 @@ function bindActions(el, ctx) {
       draw(el, ctx);
     });
   });
-}
-
-function emptyRow(cols) {
-  return `<tr><td colspan="${cols}" class="empty-row">Список пуст</td></tr>`;
 }
 
 function esc(s) {

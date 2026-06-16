@@ -16,14 +16,14 @@ export function renderSettings(el, ctx) {
   const due = countDue(ctx.state);
 
   el.innerHTML = `
-    <div class="page">
+    <div class="page settings-page">
     <h1 class="view-title">Настройки</h1>
     <p class="view-subtitle">Интервалы SRS, стоп-лист, экспорт данных.</p>
 
-    <div class="settings-grid">
+    <div class="settings-stack">
 
-      <section class="settings-panel">
-        <h2 class="settings-heading">📊 База</h2>
+      <section class="card card-padded settings-card">
+        <h2 class="settings-heading">База</h2>
         <div class="settings-stats">
           <div class="stat-item"><span class="stat-num">${stats.words}</span> слов</div>
           <div class="stat-item"><span class="stat-num">${stats.phrases}</span> выражений</div>
@@ -32,8 +32,8 @@ export function renderSettings(el, ctx) {
         </div>
       </section>
 
-      <section class="settings-panel">
-        <h2 class="settings-heading">⏱ Интервалы SRS (дней)</h2>
+      <section class="card card-padded settings-card">
+        <h2 class="settings-heading">Интервалы SRS (дней)</h2>
         <p class="settings-hint">Для уровней 1–5 после сбора всех галочек в направлении.</p>
         <div class="intervals-row">
           ${intervals.map((n, i) => `
@@ -44,8 +44,8 @@ export function renderSettings(el, ctx) {
         <button id="save-intervals" class="btn btn-sm">Сохранить интервалы</button>
       </section>
 
-      <section class="settings-panel settings-panel-wide">
-        <h2 class="settings-heading">🚫 Стоп-лист</h2>
+      <section class="card card-padded settings-card">
+        <h2 class="settings-heading">Стоп-лист</h2>
         <p class="settings-hint">Эти слова не предлагаются при импорте.</p>
         <div class="stop-tags" id="stop-tags">
           ${stopList.length
@@ -58,20 +58,21 @@ export function renderSettings(el, ctx) {
         </div>
       </section>
 
-      <section class="settings-panel">
-        <h2 class="settings-heading">💾 Данные</h2>
+      <section class="card card-padded settings-card">
+        <h2 class="settings-heading">Данные</h2>
+        <p class="settings-hint">Экспорт и импорт всей базы в .json.</p>
         <div class="row">
-          <button class="btn" id="exportBtn">📤 Экспорт .json</button>
+          <button class="btn" id="exportBtn">Экспорт .json</button>
           <label class="btn secondary" style="display:inline-block;cursor:pointer;">
-            📥 Импорт .json
+            Импорт .json
             <input type="file" id="importInput" accept=".json" hidden />
           </label>
         </div>
         <p id="settingsMsg" class="settings-msg"></p>
       </section>
 
-      <section class="settings-panel settings-panel-wide settings-danger">
-        <h2 class="settings-heading">⚠️ HARD RESET</h2>
+      <section class="card card-padded settings-card settings-danger">
+        <h2 class="settings-heading">HARD RESET</h2>
         <p class="settings-hint">Удалить все слова, выражения, сериалы, книги, прогресс SRS и историю. Стоп-лист сбросится к умолчанию. Необратимо — сначала сделайте экспорт.</p>
         <button id="hard-reset" class="btn btn-danger">HARD RESET — начать с нуля</button>
       </section>
