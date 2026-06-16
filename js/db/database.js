@@ -23,8 +23,44 @@ const BUILTIN_STOP_LIST = [
 
 const BUILTIN_STOP_SET = new Set(BUILTIN_STOP_LIST.map((s) => s.toLowerCase()));
 
+function stopEntryLemma(entry) {
+  if (typeof entry === "string") return String(entry).toLowerCase().trim();
+  return String(entry?.lemma ?? "").toLowerCase().trim();
+}
+
+function normalizeStopEntry(entry) {
+  if (typeof entry === "string") {
+    return { lemma: String(entry).trim(), translations: [] };
+  }
+  return {
+    lemma: String(entry?.lemma ?? "").trim(),
+    translations: Array.isArray(entry?.translations)
+      ? entry.translations.filter(Boolean).slice(0, 3)
+      : [],
+  };
+}
+
+function normalizeStopList(list) {
+  const seen = new Map();
+  for (const raw of list || []) {
+    const entry = normalizeStopEntry(raw);
+    if (!entry.lemma || BUILTIN_STOP_SET.has(entry.lemma.toLowerCase())) continue;
+    const key = entry.lemma.toLowerCase();
+    if (!seen.has(key)) {
+      seen.set(key, entry);
+      continue;
+    }
+    const prev = seen.get(key);
+    if (entry.translations.length && !prev.translations.length) {
+      prev.translations = entry.translations;
+    }
+  }
+  return [...seen.values()].sort((a, b) => a.lemma.localeCompare(b.lemma));
+}
+
+/** @deprecated use normalizeStopList */
 function stripBuiltinStopWords(list) {
-  return (list || []).filter((w) => !BUILTIN_STOP_SET.has(String(w).toLowerCase()));
+  return normalizeStopList(list);
 }
 
 // ---------- Генератор id ----------
@@ -178,7 +214,7 @@ export function normalizeState(data) {
         ? data.settings.intervals.map((n) => Math.max(1, Number(n) || 1)).slice(0, 5)
         : base.settings.intervals,
       stopList: Array.isArray(data?.settings?.stopList)
-        ? stripBuiltinStopWords(data.settings.stopList)
+        ? normalizeStopList(data.settings.stopList)
         : [],
       sessionHistory: Array.isArray(data?.settings?.sessionHistory)
         ? data.settings.sessionHistory.slice(0, 20)
@@ -442,7 +478,7 @@ export function isKnownPhrase(state, text) {
 // --- Проверка: лемма в стоп-листе? ---
 export function isStopWord(state, lemma) {
   const l = String(lemma).toLowerCase().trim();
-  return state.settings.stopList.some((x) => String(x).toLowerCase() === l);
+  return (state.settings.stopList || []).some((x) => stopEntryLemma(x) === l);
 }
 
 export function isStudyingLemma(state, lemma) {
@@ -676,7 +712,8 @@ export function updatePhrase(state, id, patch) {
 export function deleteWord(state, id) {
   const idx = state.words.findIndex((w) => w.id === id);
   if (idx === -1) return false;
-  addStopWord(state, state.words[idx].lemma);
+  const word = state.words[idx];
+  addStopWord(state, word.lemma, word.translations || []);
   state.words.splice(idx, 1);
   return true;
 }
@@ -752,11 +789,13 @@ export function removeKnownPhrase(state, text) {
 
 export function getStopListWords(state) {
   return (state.settings?.stopList || [])
-    .map((lemma) => {
-      const trimmed = String(lemma).trim();
+    .map((entry) => {
+      const { lemma, translations } = normalizeStopEntry(entry);
+      const word = findWordByLemma(state, lemma);
       return {
-        lemma: trimmed,
-        word: findWordByLemma(state, trimmed),
+        lemma,
+        translations: translations.length ? translations : (word?.translations || []),
+        word,
       };
     })
     .sort((a, b) => a.lemma.localeCompare(b.lemma));
@@ -766,6 +805,9 @@ export function returnStopWordToStudy(state, lemma) {
   const l = String(lemma).toLowerCase().trim();
   if (!l || !isStopWord(state, lemma)) return false;
 
+  const stopEntry = (state.settings.stopList || []).find((x) => stopEntryLemma(x) === l);
+  const savedTranslations = stopEntry ? normalizeStopEntry(stopEntry).translations : [];
+
   removeStopWord(state, lemma);
   removeKnownLemma(state, lemma);
 
@@ -773,8 +815,11 @@ export function returnStopWordToStudy(state, lemma) {
   if (existing) {
     existing.learned = false;
     existing.srs = emptySrs();
+    if (savedTranslations.length && !existing.translations?.length) {
+      existing.translations = savedTranslations;
+    }
   } else {
-    addWordManual(state, { lemma: String(lemma).trim(), translations: [] });
+    addWordManual(state, { lemma: String(lemma).trim(), translations: savedTranslations });
   }
   return true;
 }
@@ -855,7 +900,8 @@ export function returnPhraseToStudy(state, text) {
 export function excludeWordFromImport(state, lemma) {
   const l = String(lemma).toLowerCase().trim();
   if (!l) return false;
-  addStopWord(state, lemma);
+  const word = findWordByLemma(state, lemma);
+  addStopWord(state, lemma, word?.translations || []);
   addKnownLemma(state, lemma);
   return true;
 }
@@ -957,12 +1003,24 @@ export function getAppStats(state) {
 // ===================================================================
 
 // --- Добавить лемму в стоп-лист («мусорка») ---
-export function addStopWord(state, lemma) {
-  const l = String(lemma).toLowerCase().trim();
+export function addStopWord(state, lemma, translations = []) {
+  const trimmed = String(lemma).trim();
+  const l = trimmed.toLowerCase();
   if (!l) return false;
   if (!Array.isArray(state.settings.stopList)) state.settings.stopList = [];
-  if (state.settings.stopList.some((x) => String(x).toLowerCase() === l)) return false;
-  state.settings.stopList.push(l);
+
+  const trans = Array.isArray(translations) ? translations.filter(Boolean).slice(0, 3) : [];
+  const idx = state.settings.stopList.findIndex((x) => stopEntryLemma(x) === l);
+
+  if (idx >= 0) {
+    const existing = normalizeStopEntry(state.settings.stopList[idx]);
+    if (trans.length && !existing.translations.length) {
+      state.settings.stopList[idx] = { lemma: existing.lemma || trimmed, translations: trans };
+    }
+    return false;
+  }
+
+  state.settings.stopList.push({ lemma: trimmed, translations: trans });
   return true;
 }
 
@@ -971,9 +1029,27 @@ export function removeStopWord(state, lemma) {
   const l = String(lemma).toLowerCase().trim();
   const before = state.settings.stopList.length;
   state.settings.stopList = state.settings.stopList.filter(
-    (x) => String(x).toLowerCase() !== l
+    (x) => stopEntryLemma(x) !== l
   );
   return state.settings.stopList.length !== before;
+}
+
+export function repairStopListTranslations(state, lookup) {
+  if (typeof lookup !== "function") return false;
+  let changed = false;
+
+  state.settings.stopList = (state.settings.stopList || []).map((entry) => {
+    const normalized = normalizeStopEntry(entry);
+    if (normalized.translations.length || !normalized.lemma) return normalized;
+
+    const fromDict = lookup(normalized.lemma);
+    if (!fromDict?.length) return normalized;
+
+    changed = true;
+    return { lemma: normalized.lemma, translations: fromDict.slice(0, 3) };
+  });
+
+  return changed;
 }
 
 // --- Добавить лемму в Базу знаний («знаю») ---

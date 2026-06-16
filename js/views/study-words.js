@@ -104,7 +104,7 @@ function rowHtml(w) {
 
   return `
     <tr data-id="${w.id}">
-      <td class="col-word"><strong>${esc(w.lemma)}</strong><br><span class="tag tag-new">изучаю</span></td>
+      <td class="col-word"><strong>${esc(w.lemma)}</strong></td>
       <td class="col-trans-cell">${transChipsHtml(w.translations || [], { id: w.id })}</td>
       <td class="col-actions">
         <div class="row-actions">

@@ -1,5 +1,4 @@
 import { calcReadiness, calcReadinessForSources, progressBarHtml, episodeLabel } from "../core/readiness.js";
-import { startPrepTraining } from "../router.js";
 
 export function renderShows(el, ctx) {
   const shows = ctx.state.shows || [];
@@ -29,7 +28,7 @@ export function renderShows(el, ctx) {
   el.querySelectorAll(".tree-prep-btn").forEach((btn) => {
     btn.addEventListener("click", () => {
       if (btn.disabled) return;
-      startPrepTraining(btn.dataset.source, btn.dataset.label);
+      ctx.startPrepTraining?.(btn.dataset.source, btn.dataset.label);
     });
   });
 }

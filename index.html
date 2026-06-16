@@ -6,7 +6,7 @@
   <meta name="theme-color" content="#0f172a" />
   <meta name="description" content="Оффлайн-приложение для изучения английского по сериалам и книгам." />
   <title>Serial English</title>
-  <link rel="stylesheet" href="css/styles.css?v=20260630" />
+  <link rel="stylesheet" href="css/styles.css?v=20260704" />
 </head>
 <body>
   <div class="app" id="app">
@@ -45,16 +45,15 @@
           <span class="nav-label">Настройки</span>
         </button>
       </nav>
+      <div class="sidebar-footer">
+        <button class="menu-item sidebar-toggle" id="sidebar-toggle" type="button" aria-label="Свернуть меню">
+          <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><rect width="18" height="18" x="3" y="3" rx="2"/><path d="M9 3v18"/></svg>
+          <span class="nav-label">Свернуть меню</span>
+        </button>
+      </div>
     </aside>
 
     <div class="main-wrap">
-      <header class="app-header desktop-header">
-        <button class="icon-btn sidebar-toggle" id="sidebar-toggle" type="button" aria-label="Свернуть меню">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect width="18" height="18" x="3" y="3" rx="2"/><path d="M9 3v18"/></svg>
-        </button>
-        <span class="header-subtitle">Оффлайн словарь</span>
-      </header>
-
       <main class="content" id="content"></main>
     </div>
 
@@ -99,6 +98,6 @@
     </div>
   </div>
 
-  <script type="module" src="js/app.js?v=20260630"></script>
+  <script type="module" src="js/app.js?v=20260704"></script>
 </body>
 </html>

@@ -1,10 +1,10 @@
-import { renderImport } from "./views/import.js?v=20260630";
-import { renderKnowledge } from "./views/knowledge.js?v=20260630";
-import { renderTraining } from "./views/training.js?v=20260630";
-import { renderShows } from "./views/shows.js?v=20260630";
-import { renderBooks } from "./views/books.js?v=20260630";
-import { renderSettings } from "./views/settings.js?v=20260630";
-import { refreshPageScrollTop } from "./ui/scroll-top.js?v=20260630";
+import { renderImport } from "./views/import.js?v=20260704";
+import { renderKnowledge } from "./views/knowledge.js?v=20260704";
+import { renderTraining } from "./views/training.js?v=20260704";
+import { renderShows } from "./views/shows.js?v=20260704";
+import { renderBooks } from "./views/books.js?v=20260704";
+import { renderSettings } from "./views/settings.js?v=20260704";
+import { refreshPageScrollTop } from "./ui/scroll-top.js?v=20260704";
 
 const routes = {
   import: renderImport,
@@ -73,12 +73,24 @@ function initShell() {
   document.querySelectorAll(".mobile-nav-item[data-route]").forEach(bindNavItem);
 
   document.getElementById("sidebar-toggle")?.addEventListener("click", () => {
-    document.getElementById("app")?.classList.toggle("sidebar-collapsed");
+    const app = document.getElementById("app");
+    const btn = document.getElementById("sidebar-toggle");
+    const collapsed = app?.classList.toggle("sidebar-collapsed");
+    if (btn) {
+      btn.setAttribute("aria-label", collapsed ? "Развернуть меню" : "Свернуть меню");
+      const label = btn.querySelector(".nav-label");
+      if (label) label.textContent = collapsed ? "Развернуть меню" : "Свернуть меню";
+    }
   });
 }
 
 export function initRouter(ctx) {
   appCtx = ctx;
+  ctx.startPrepTraining = (sourceId, label) => {
+    navigateTo("training", {
+      trainingPrep: { sourceId, label },
+    });
+  };
   initShell();
   navigateTo("import");
 }

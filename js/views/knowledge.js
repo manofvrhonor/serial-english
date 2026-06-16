@@ -9,6 +9,7 @@ import {
   excludePhraseFromImport,
   addStopWord,
   removeStopWord,
+  repairStopListTranslations,
   getAppStats,
 } from "../db/database.js";
 import { countDue } from "../core/srs.js";
@@ -131,6 +132,7 @@ function draw(el, ctx) {
   } else {
     content.innerHTML = stopListTable(stopWords);
     bindStopListActions(el, ctx);
+    enrichStopListTranslations(ctx, el);
   }
 
   bindScrollTop();
@@ -256,7 +258,7 @@ function learnedWordRow(entry) {
 
   return `
     <tr data-lemma="${escAttr(lemma)}">
-      <td><strong>${esc(lemma)}</strong><br><span class="tag tag-known">выучено</span> ${inCards}</td>
+      <td><strong>${esc(lemma)}</strong>${inCards ? ` ${inCards}` : ""}</td>
       <td class="col-trans-cell">${esc(trans)}</td>
       <td class="col-actions">
         <button type="button" class="btn outline btn-sm" data-act="return-word" data-lemma="${escAttr(lemma)}" title="Вернуть в изучение">↩</button>
@@ -271,8 +273,8 @@ function learnedPhraseRow(entry) {
 
   return `
     <tr data-text="${escAttr(text)}">
-      <td><strong>${esc(text)}</strong><br><span class="tag tag-known">выучено</span>
-        ${phrase ? `<span class="tag tag-manual">в карточках</span>` : ""}</td>
+      <td><strong>${esc(text)}</strong>
+        ${phrase ? ` <span class="tag tag-manual">в карточках</span>` : ""}</td>
       <td class="col-trans-cell">${esc(trans)}</td>
       <td class="col-actions">
         <button type="button" class="btn outline btn-sm" data-act="return-phrase" data-text="${escAttr(text)}" title="Вернуть в изучение">↩</button>
@@ -282,19 +284,32 @@ function learnedPhraseRow(entry) {
 }
 
 function stopWordRow(entry) {
-  const { lemma, word } = entry;
-  const trans = word?.translations?.length ? word.translations.join(", ") : "—";
+  const { lemma, translations, word } = entry;
+  const trans = translations?.length ? translations.join(", ") : "—";
   const inCards = word ? `<span class="tag tag-manual">в карточках</span>` : "";
 
   return `
     <tr data-lemma="${escAttr(lemma)}">
-      <td><strong>${esc(lemma)}</strong><br><span class="tag tag-stop">стоп</span> ${inCards}</td>
+      <td><strong>${esc(lemma)}</strong>${inCards ? ` ${inCards}` : ""}</td>
       <td class="col-trans-cell">${esc(trans)}</td>
       <td class="col-actions">
         <button type="button" class="btn outline btn-sm" data-act="return-stop-word" data-lemma="${escAttr(lemma)}" title="Вернуть в изучение">↩</button>
         <button type="button" class="btn outline btn-sm btn-icon-danger" data-act="remove-stop-word" data-lemma="${escAttr(lemma)}" title="Убрать из стоп-листа">✕</button>
       </td>
     </tr>`;
+}
+
+async function enrichStopListTranslations(ctx, el) {
+  try {
+    const dict = await getDictionary();
+    const changed = repairStopListTranslations(ctx.state, (lemma) => translate(lemma, dict));
+    if (changed) {
+      ctx.save();
+      draw(el, ctx);
+    }
+  } catch (err) {
+    console.warn("Не удалось подставить переводы для стоп-листа:", err);
+  }
 }
 
 async function enrichLearnedTranslations(ctx, el) {
@@ -416,7 +431,8 @@ function filterItems(items, q, getKey) {
     const key = getKey(item).toLowerCase();
     if (key.includes(s)) return true;
     const obj = item.word || item.phrase;
-    return (obj?.translations || []).some((t) => t.toLowerCase().includes(s));
+    const trans = item.translations || obj?.translations || [];
+    return trans.some((t) => t.toLowerCase().includes(s));
   });
 }
 

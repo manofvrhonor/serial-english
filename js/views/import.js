@@ -599,7 +599,7 @@ function handleRowAction(el, ctx, btn, kind) {
       });
     }
   } else if (act === "stop" && kind === "word") {
-    addStopWord(ctx.state, item.lemma);
+    addStopWord(ctx.state, item.lemma, resolveTranslations(item));
   }
   ctx.save();
 
