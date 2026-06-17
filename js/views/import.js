@@ -7,7 +7,7 @@ import {
 import { getDictionary, getFormsIndex, translate, translatorUrl } from "../import/dictionary.js";
 import { getPhrases, translatePhrase } from "../import/phrases.js";
 import { attachSwipeCard } from "../ui/swipe-card.js";
-import { transChipsHtml, bindTransChipsContainers } from "../ui/trans-chips.js";
+import { transChipsHtml, bindTransChipsContainers } from "../ui/trans-chips.js?v=20260714";
 import { refreshPageScrollTop, unbindScrollTop } from "../ui/scroll-top.js";
 
 let session = null;
@@ -24,15 +24,14 @@ export function renderImport(el, ctx) {
   el.innerHTML = `
     <div class="page import-page">
       <h1 class="view-title view-title-section">Импорт текста</h1>
-      <p class="view-subtitle">Загрузите субтитры (.srt) или текст главы (.txt).</p>
 
       <div class="card card-padded">
         <div class="import-upload">
           <label class="import-filelabel">
             <input type="file" id="import-file" accept=".srt,.txt" hidden />
-            <span class="import-filebtn btn btn-lg">Выбрать файл</span>
+            <span class="import-filebtn btn btn-lg">Загрузить файл</span>
           </label>
-          <span id="import-filename" class="import-filename">.srt или .txt</span>
+          <span id="import-filename" class="import-filename">srt или txt</span>
         </div>
         <div id="import-meta" class="import-meta" hidden></div>
       </div>
@@ -662,7 +661,7 @@ function commit(el, ctx) {
 
 function resetImportFileForm(el) {
   const filename = el.querySelector("#import-filename");
-  if (filename) filename.textContent = ".srt или .txt";
+  if (filename) filename.textContent = "srt или txt";
   const meta = el.querySelector("#import-meta");
   if (meta) {
     meta.hidden = true;

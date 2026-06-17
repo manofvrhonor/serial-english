@@ -1,11 +1,10 @@
 import {
-  addWordManual,
   updateWord,
   deleteWord,
   markWordLearned,
 } from "../db/database.js";
-import { transChipsHtml, bindTransChipsContainers } from "../ui/trans-chips.js";
-import { openSourcesModal } from "../ui/sources-modal.js";
+import { transChipsHtml, bindTransChipsContainers } from "../ui/trans-chips.js?v=20260715";
+import { openSourcesModal } from "../ui/sources-modal.js?v=20260715";
 
 const ICON_SOURCES = `<svg class="btn-icon-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M3 5h.01"/><path d="M3 12h.01"/><path d="M3 19h.01"/><path d="M8 5h13"/><path d="M8 12h13"/><path d="M8 19h13"/></svg>`;
 
@@ -19,12 +18,6 @@ export function mountWordsPanel(mountEl, ctx, options = {}) {
     const words = getFilteredWords(ctx.state, panel.query);
 
     mountEl.innerHTML = `
-      <div id="${prefix}-add-form" class="list-add-form" hidden>
-        <input type="text" id="${prefix}-new-lemma" placeholder="Слово (english)" />
-        <div id="${prefix}-new-trans-chips"></div>
-        <button id="${prefix}-save-new" class="btn">Сохранить</button>
-        <button id="${prefix}-cancel-new" class="btn secondary">Отмена</button>
-      </div>
       <div class="card list-card">
         <div class="list-table-wrap">
           <table class="list-table list-table-compact">
@@ -37,23 +30,6 @@ export function mountWordsPanel(mountEl, ctx, options = {}) {
           </table>
         </div>
       </div>`;
-
-    mountEl.querySelector(`#${prefix}-cancel-new`)?.addEventListener("click", () => {
-      mountEl.querySelector(`#${prefix}-add-form`).hidden = true;
-    });
-
-    mountEl.querySelector(`#${prefix}-save-new`)?.addEventListener("click", () => {
-      const lemma = mountEl.querySelector(`#${prefix}-new-lemma`).value.trim();
-      const chipBox = mountEl.querySelector(`#${prefix}-new-trans-chips .trans-chips`);
-      const trans = chipBox
-        ? [...chipBox.querySelectorAll(".trans-chip-text")].map((n) => n.textContent.trim()).filter(Boolean)
-        : [];
-      if (!lemma) return alert("Введите слово.");
-      addWordManual(ctx.state, { lemma, translations: trans });
-      ctx.save();
-      options.onChange?.();
-      draw();
-    });
 
     bindActions(mountEl, ctx, prefix, () => {
       options.onChange?.();
@@ -71,17 +47,6 @@ export function mountWordsPanel(mountEl, ctx, options = {}) {
       panel.query = q;
       draw();
     },
-    openAddForm() {
-      const form = mountEl.querySelector(`#${prefix}-add-form`);
-      if (!form) return;
-      form.hidden = false;
-      const box = mountEl.querySelector(`#${prefix}-new-trans-chips`);
-      box.innerHTML = transChipsHtml([], { id: `${prefix}-new-word` });
-      bindTransChipsContainers(box.parentElement, { onChange() {} });
-    },
-    getCount() {
-      return getFilteredWords(ctx.state, panel.query).length;
-    },
   };
 }
 
@@ -96,11 +61,19 @@ function getFilteredWords(state, q) {
   }).sort((a, b) => a.lemma.localeCompare(b.lemma));
 }
 
+function isManualWord(w) {
+  return Boolean(w.manual) || !(w.sources || []).length;
+}
+
 function rowHtml(w) {
+  const manual = isManualWord(w);
   const sourceCount = (w.sources || []).length;
-  const sourcesTitle = sourceCount
-    ? `Источники (${sourceCount})`
-    : "Нет источников";
+  const sourcesTitle = manual && !sourceCount
+    ? "Добавлено вручную"
+    : sourceCount
+      ? `Источники (${sourceCount})`
+      : "Нет источников";
+  const canShowSources = manual || sourceCount > 0;
 
   return `
     <tr data-id="${w.id}">
@@ -110,7 +83,7 @@ function rowHtml(w) {
         <div class="row-actions">
           <button type="button" class="btn outline btn-sm btn-icon-only" data-act="learn" data-id="${w.id}" title="Выучено">✓</button>
           <button type="button" class="btn outline btn-sm btn-icon-only btn-icon-danger" data-act="delete" data-id="${w.id}" title="Удалить слово">✕</button>
-          <button type="button" class="btn outline btn-sm btn-icon-only" data-act="sources" data-id="${w.id}" title="${escAttr(sourcesTitle)}" ${sourceCount ? "" : "disabled"}>${ICON_SOURCES}</button>
+          <button type="button" class="btn outline btn-sm btn-icon-only" data-act="sources" data-id="${w.id}" title="${escAttr(sourcesTitle)}" ${canShowSources ? "" : "disabled"}>${ICON_SOURCES}</button>
         </div>
       </td>
     </tr>`;
@@ -138,7 +111,7 @@ function bindActions(el, ctx, prefix, onDone) {
       } else if (btn.dataset.act === "sources") {
         const word = ctx.state.words.find((w) => w.id === id);
         if (!word) return;
-        openSourcesModal(ctx.state, word.sources, word.lemma);
+        openSourcesModal(ctx.state, word.sources, word.lemma, { manual: isManualWord(word) });
       }
     });
   });

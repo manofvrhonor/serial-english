@@ -1,5 +1,8 @@
 const MAX_TRANS = 3;
 
+const rootHandlers = new WeakMap();
+const boundRoots = new WeakSet();
+
 function esc(s) {
   return String(s ?? "").replace(/[&<>"']/g, (c) => ({
     "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;",
@@ -44,73 +47,98 @@ function renderChips(container, translations) {
  * @param {ParentNode} root
  * @param {{ onChange: (id: string, translations: string[]) => void }} handlers
  */
-export function bindTransChipsContainers(root, { onChange }) {
-  root.querySelectorAll(".trans-chips[data-editable='1']").forEach((container) => {
-    bindOne(container, onChange);
-  });
+export function bindTransChipsContainers(root, handlers) {
+  rootHandlers.set(root, handlers);
+  if (boundRoots.has(root)) return;
+  boundRoots.add(root);
+  bindDelegated(root);
 }
 
-function bindOne(container, onChange) {
-  const id = container.dataset.chipsId;
+function bindDelegated(root) {
   let dragFrom = null;
+  let dragContainer = null;
 
-  const emit = (list) => {
+  const emit = (container, list) => {
+    const handlers = rootHandlers.get(root);
+    if (!handlers) return;
     const next = list.filter(Boolean).slice(0, MAX_TRANS);
-    onChange(id, next);
+    handlers.onChange(container.dataset.chipsId, next);
   };
 
-  container.querySelectorAll(".trans-chip-remove").forEach((btn) => {
-    btn.addEventListener("click", (e) => {
-      e.stopPropagation();
-      const chip = btn.closest(".trans-chip");
-      const idx = +chip.dataset.idx;
-      const list = readChips(container);
-      list.splice(idx, 1);
-      const next = renderChips(container, list);
-      bindOne(next, onChange);
-      emit(list);
-    });
-  });
-
-  container.querySelectorAll(".trans-chip[draggable='true']").forEach((chip) => {
-    chip.addEventListener("dragstart", (e) => {
-      dragFrom = +chip.dataset.idx;
-      chip.classList.add("trans-chip-dragging");
-      e.dataTransfer.effectAllowed = "move";
-    });
-    chip.addEventListener("dragend", () => {
-      chip.classList.remove("trans-chip-dragging");
-      dragFrom = null;
-    });
-    chip.addEventListener("dragover", (e) => {
-      e.preventDefault();
-      e.dataTransfer.dropEffect = "move";
-    });
-    chip.addEventListener("drop", (e) => {
-      e.preventDefault();
-      const to = +chip.dataset.idx;
-      if (dragFrom === null || dragFrom === to) return;
-      const list = readChips(container);
-      const [moved] = list.splice(dragFrom, 1);
-      list.splice(to, 0, moved);
-      const next = renderChips(container, list);
-      bindOne(next, onChange);
-      emit(list);
-    });
-  });
-
-  container.querySelector(".trans-chip-add")?.addEventListener("keydown", (e) => {
-    if (e.key !== "Enter") return;
+  root.addEventListener("click", (e) => {
+    const btn = e.target.closest(".trans-chip-remove");
+    if (!btn || !root.contains(btn)) return;
     e.preventDefault();
-    const val = e.target.value.trim();
+    e.stopPropagation();
+
+    const container = btn.closest(".trans-chips");
+    if (!container || container.dataset.editable !== "1") return;
+
+    const chip = btn.closest(".trans-chip");
+    const idx = +chip.dataset.idx;
+    const list = readChips(container);
+    list.splice(idx, 1);
+    emit(renderChips(container, list), list);
+  });
+
+  root.addEventListener("keydown", (e) => {
+    if (e.key !== "Enter") return;
+    const input = e.target.closest(".trans-chip-add");
+    if (!input || !root.contains(input)) return;
+    e.preventDefault();
+
+    const container = input.closest(".trans-chips");
+    if (!container || container.dataset.editable !== "1") return;
+
+    const val = input.value.trim();
     if (!val) return;
     const list = readChips(container);
     if (list.length >= MAX_TRANS) return;
     list.push(val);
-    e.target.value = "";
-    const next = renderChips(container, list);
-    bindOne(next, onChange);
-    emit(list);
+    input.value = "";
+    emit(renderChips(container, list), list);
+  });
+
+  root.addEventListener("dragstart", (e) => {
+    const chip = e.target.closest(".trans-chip[draggable='true']");
+    if (!chip || !root.contains(chip)) return;
+    dragFrom = +chip.dataset.idx;
+    dragContainer = chip.closest(".trans-chips");
+    chip.classList.add("trans-chip-dragging");
+    e.dataTransfer.effectAllowed = "move";
+  });
+
+  root.addEventListener("dragend", (e) => {
+    const chip = e.target.closest(".trans-chip");
+    if (chip) chip.classList.remove("trans-chip-dragging");
+    dragFrom = null;
+    dragContainer = null;
+  });
+
+  root.addEventListener("dragover", (e) => {
+    const chip = e.target.closest(".trans-chip[draggable='true']");
+    if (!chip || !root.contains(chip)) return;
+    e.preventDefault();
+    e.dataTransfer.dropEffect = "move";
+  });
+
+  root.addEventListener("drop", (e) => {
+    const chip = e.target.closest(".trans-chip[draggable='true']");
+    if (!chip || !root.contains(chip)) return;
+    e.preventDefault();
+
+    const container = chip.closest(".trans-chips");
+    if (!container || container !== dragContainer || dragFrom === null) return;
+
+    const to = +chip.dataset.idx;
+    if (dragFrom === to) return;
+
+    const list = readChips(container);
+    const [moved] = list.splice(dragFrom, 1);
+    list.splice(to, 0, moved);
+    emit(renderChips(container, list), list);
+    dragFrom = null;
+    dragContainer = null;
   });
 }
 

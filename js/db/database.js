@@ -103,7 +103,7 @@ export function emptySrs() {
 }
 
 // ---------- Фабрики сущностей ----------
-export function makeWord({ lemma, forms = [], translations = [], sources = [] }) {
+export function makeWord({ lemma, forms = [], translations = [], sources = [], manual = false }) {
   return {
     id: makeId("w"),
     lemma,
@@ -111,6 +111,7 @@ export function makeWord({ lemma, forms = [], translations = [], sources = [] })
     translations,
     sources: Array.isArray(sources) ? sources : (sources ? [sources] : []),
     learned: false,
+    manual: Boolean(manual),
     srs: emptySrs(),
     createdAt: Date.now(),
   };
@@ -291,6 +292,7 @@ function normalizeWord(w) {
     translations: Array.isArray(w?.translations) ? w.translations : [],
     sources: toSources(w),
     learned: Boolean(w?.learned),
+    manual: Boolean(w?.manual),
     srs: normalizeSrs(w?.srs),
     createdAt: typeof w?.createdAt === "number" ? w.createdAt : Date.now(),
   };
@@ -677,7 +679,7 @@ export function addWordManual(state, { lemma, translations = [] }) {
   const existing = findWordByLemma(state, l);
   if (existing) return existing;
 
-  const word = makeWord({ lemma: l, translations: translations.filter(Boolean).slice(0, 3) });
+  const word = makeWord({ lemma: l, translations: translations.filter(Boolean).slice(0, 3), manual: true });
   state.words.push(word);
   return word;
 }
@@ -1064,7 +1066,7 @@ export function addKnownLemma(state, lemma) {
 }
 
 /** «Знаю» при импорте — сохраняет карточку с переводами (не только лемму). */
-export function addKnownWordFromImport(state, { lemma, translations = [], forms = [], sources = [] }) {
+export function addKnownWordFromImport(state, { lemma, translations = [], forms = [], sources = [], manual = false }) {
   const l = String(lemma ?? "").trim();
   if (!l) return null;
 
@@ -1078,8 +1080,9 @@ export function addKnownWordFromImport(state, { lemma, translations = [], forms 
     if (forms?.length) {
       word.forms = [...new Set([...(word.forms || []), ...forms])];
     }
+    if (manual) word.manual = true;
   } else {
-    word = makeWord({ lemma: l, translations: trans, forms: forms || [], sources });
+    word = makeWord({ lemma: l, translations: trans, forms: forms || [], sources, manual });
     word.learned = true;
     state.words.push(word);
   }

@@ -6,7 +6,7 @@
   <meta name="theme-color" content="#0f172a" />
   <meta name="description" content="Оффлайн-приложение для изучения английского по сериалам и книгам." />
   <title>Serial English</title>
-  <link rel="stylesheet" href="css/styles.css?v=20260704" />
+  <link rel="stylesheet" href="css/styles.css?v=20260717" />
 </head>
 <body>
   <div class="app" id="app">
@@ -98,6 +98,25 @@
     </div>
   </div>
 
-  <script type="module" src="js/app.js?v=20260704"></script>
+  <div class="modal" id="kb-add-modal" hidden>
+    <div class="modal-backdrop" id="kb-add-backdrop"></div>
+    <div class="modal-card card card-padded" role="dialog" aria-labelledby="kb-add-title">
+      <h2 class="settings-heading" id="kb-add-title">Добавить</h2>
+      <label class="field-label field-full">
+        <span id="kb-modal-field-label">Слово</span>
+        <input type="text" id="kb-modal-text" autocomplete="off" />
+      </label>
+      <div class="field-label field-full">
+        <span class="field-label-text">Перевод</span>
+        <div id="kb-modal-trans-chips"></div>
+      </div>
+      <div class="modal-actions">
+        <button type="button" class="btn secondary" id="kb-modal-cancel">Отмена</button>
+        <button type="button" class="btn" id="kb-modal-save">Сохранить</button>
+      </div>
+    </div>
+  </div>
+
+  <script type="module" src="js/app.js?v=20260717"></script>
 </body>
 </html>

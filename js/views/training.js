@@ -109,7 +109,6 @@ function renderSetup(el, ctx) {
         </label>
 
         <button id="t-start" class="btn btn-lg btn-block">Начать тренировку</button>
-        <p class="train-batch-hint">1 шаг = ${STEP_SIZE} карточек, затем короткая статистика.</p>
       </div>
 
       ${today.steps ? `
@@ -123,13 +122,10 @@ function renderSetup(el, ctx) {
 
       ${history.length ? `
         <section class="train-history card list-card train-secondary-block">
-          <div class="card-padded" style="padding-bottom:0">
-            <h2 class="settings-heading">Последние шаги</h2>
-          </div>
           <div class="list-table-wrap">
             <table class="list-table">
               <thead><tr>
-                <th>Дата</th><th>Карточек</th><th>Верно</th><th>Ошибок</th><th>Источник</th>
+                <th>Дата</th><th>Карточек</th><th>Верно</th><th>Ошибок</th>
               </tr></thead>
               <tbody>${history.slice(0, 10).map(sessionRow).join("")}</tbody>
             </table>
@@ -494,7 +490,6 @@ function sessionRow(s) {
       <td>${s.total}</td>
       <td class="c-new">${s.correct} (${pct}%)</td>
       <td class="c-stop">${s.wrong}</td>
-      <td>${esc(s.prepLabel || "—")}</td>
     </tr>`;
 }
 

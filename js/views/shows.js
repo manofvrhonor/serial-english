@@ -1,4 +1,4 @@
-import { calcReadiness, calcReadinessForSources, progressBarHtml, episodeLabel } from "../core/readiness.js";
+import { calcReadiness, calcReadinessForSources, episodeLabel } from "../core/readiness.js";
 
 export function renderShows(el, ctx) {
   const shows = ctx.state.shows || [];
@@ -21,7 +21,6 @@ export function renderShows(el, ctx) {
   el.innerHTML = `
     <div class="page">
     <h1 class="view-title view-title-section">Сериалы</h1>
-    <p class="view-subtitle">Готовность = выученные / все слова и выражения серии.</p>
     <div class="source-cards">${cards}</div>
     </div>`;
 
@@ -53,7 +52,6 @@ function renderShowCard(ctx, show) {
         <h2 class="source-card-title">${esc(show.title)}</h2>
         <span class="source-badge">${readiness.learned}/${readiness.total} изучено</span>
       </div>
-      ${progressBarHtml(readiness, true)}
       <div class="source-body">${seasons || `<p class="source-empty">Нет сезонов</p>`}</div>
     </article>`;
 }
@@ -82,7 +80,6 @@ function renderEpisodeCard(ctx, show, season, ep) {
     <div class="source-ep-card">
       <div class="source-ep-head">
         <span class="source-ep-label">${esc(label)}</span>
-        <span class="source-ep-count">${readiness.learned}/${readiness.total}</span>
       </div>
       <div class="prog-bar prog-bar-thin" title="${readiness.learned} из ${readiness.total}">
         <div class="prog-fill" style="width:${readiness.percent}%"></div>

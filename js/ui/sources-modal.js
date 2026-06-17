@@ -28,7 +28,7 @@ function ensureModal() {
   return modal;
 }
 
-export function openSourcesModal(state, sourceIds, itemLabel = "") {
+export function openSourcesModal(state, sourceIds, itemLabel = "", { manual = false } = {}) {
   const modal = ensureModal();
   const ids = (sourceIds || []).filter(Boolean);
   const labels = ids.map((id) => formatSourceShort(state, id)).filter(Boolean);
@@ -38,9 +38,13 @@ export function openSourcesModal(state, sourceIds, itemLabel = "") {
     : "Источники";
 
   const list = modal.querySelector("#sources-modal-list");
-  list.innerHTML = labels.length
-    ? labels.map((l) => `<li>${esc(l)}</li>`).join("")
-    : `<li class="sources-modal-empty">Нет источников</li>`;
+  if (manual && !labels.length) {
+    list.innerHTML = `<li class="sources-modal-empty">Добавлено вручную</li>`;
+  } else if (labels.length) {
+    list.innerHTML = labels.map((l) => `<li>${esc(l)}</li>`).join("");
+  } else {
+    list.innerHTML = `<li class="sources-modal-empty">Нет источников</li>`;
+  }
 
   modal.hidden = false;
 }

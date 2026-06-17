@@ -1,4 +1,4 @@
-import { calcReadiness, calcReadinessForSources, progressBarHtml, chapterLabel } from "../core/readiness.js";
+import { calcReadiness, calcReadinessForSources, chapterLabel } from "../core/readiness.js";
 
 export function renderBooks(el, ctx) {
   const books = ctx.state.books || [];
@@ -21,7 +21,6 @@ export function renderBooks(el, ctx) {
   el.innerHTML = `
     <div class="page">
     <h1 class="view-title view-title-section">Книги</h1>
-    <p class="view-subtitle">Готовность = выученные / все слова и выражения главы.</p>
     <div class="source-cards">${cards}</div>
     </div>`;
 
@@ -50,7 +49,6 @@ function renderBookCard(ctx, book) {
         <h2 class="source-card-title">${esc(book.title)}</h2>
         <span class="source-badge">${readiness.learned}/${readiness.total} изучено</span>
       </div>
-      ${progressBarHtml(readiness, true)}
       <div class="source-ep-grid">${chapters || `<p class="source-empty">Нет глав</p>`}</div>
     </article>`;
 }
@@ -65,7 +63,6 @@ function renderChapterCard(ctx, book, ch) {
     <div class="source-ep-card">
       <div class="source-ep-head">
         <span class="source-ep-label">${esc(label)}</span>
-        <span class="source-ep-count">${readiness.learned}/${readiness.total}</span>
       </div>
       <div class="prog-bar prog-bar-thin" title="${readiness.learned} из ${readiness.total}">
         <div class="prog-fill" style="width:${readiness.percent}%"></div>

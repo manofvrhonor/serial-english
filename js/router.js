@@ -1,10 +1,10 @@
-import { renderImport } from "./views/import.js?v=20260704";
-import { renderKnowledge } from "./views/knowledge.js?v=20260704";
-import { renderTraining } from "./views/training.js?v=20260704";
-import { renderShows } from "./views/shows.js?v=20260704";
-import { renderBooks } from "./views/books.js?v=20260704";
-import { renderSettings } from "./views/settings.js?v=20260704";
-import { refreshPageScrollTop } from "./ui/scroll-top.js?v=20260704";
+import { renderImport } from "./views/import.js?v=20260717";
+import { renderKnowledge } from "./views/knowledge.js?v=20260717";
+import { renderTraining } from "./views/training.js?v=20260717";
+import { renderShows } from "./views/shows.js?v=20260717";
+import { renderBooks } from "./views/books.js?v=20260717";
+import { renderSettings } from "./views/settings.js?v=20260717";
+import { refreshPageScrollTop } from "./ui/scroll-top.js?v=20260717";
 
 const routes = {
   import: renderImport,

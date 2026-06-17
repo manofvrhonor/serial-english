@@ -396,16 +396,32 @@ textarea:focus-visible {
 }
 
 /* ===== Import ===== */
-.import-upload { margin: 0 0 1rem; display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+.import-upload {
+  margin: 0 0 1rem;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.625rem;
+  text-align: center;
+}
+.import-filelabel { display: block; width: 100%; max-width: 16rem; }
 .import-filebtn {
-  display: inline-flex; align-items: center; gap: 0.5rem;
-  padding: 0.625rem 1.25rem; border-radius: var(--radius-md);
-  background: var(--primary); color: var(--primary-foreground);
-  cursor: pointer; font-size: 0.875rem; font-weight: 500;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  min-height: 2.75rem;
+  padding: 0.625rem 2.5rem;
+  border-radius: var(--radius-md);
+  background: var(--primary);
+  color: var(--primary-foreground);
+  cursor: pointer;
+  font-size: 0.9375rem;
+  font-weight: 500;
   box-shadow: 0 1px 2px oklch(0 0 0 / 6%);
 }
 .import-filebtn:hover { opacity: 0.9; }
-.import-filename { color: var(--muted-foreground); font-size: 0.875rem; }
+.import-filename { color: var(--muted-foreground); font-size: 0.8125rem; }
 
 .import-meta { margin-top: 1rem; }
 .import-section-title { font-size: 0.9375rem; font-weight: 600; margin: 0 0 0.75rem; }
@@ -610,12 +626,31 @@ textarea:focus-visible {
 }
 .list-filter { padding: 0.5rem 0.75rem; font-size: 0.875rem; }
 .list-add-form {
-  display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 16px;
-  padding: 12px; background: var(--card); border: 1px solid var(--border);
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-bottom: 16px;
+  padding: 12px;
+  background: var(--card);
+  border: 1px solid var(--border);
   border-radius: var(--radius-lg);
 }
+.list-add-form-input {
+  width: 100%;
+  padding: 0.5rem 0.75rem;
+  font-size: 0.875rem;
+}
+.list-add-form-chips { width: 100%; }
+.list-add-form-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
 .list-add-form input {
-  flex: 1; min-width: 160px; padding: 0.5rem 0.75rem; font-size: 0.875rem;
+  flex: 1;
+  min-width: 160px;
+  padding: 0.5rem 0.75rem;
+  font-size: 0.875rem;
 }
 .list-summary { font-size: 0.8125rem; color: var(--muted-foreground); margin-bottom: 8px; }
 .list-table-wrap {
@@ -1171,7 +1206,30 @@ textarea:focus-visible {
 }
 
 /* ===== Knowledge hub ===== */
+.kb-search-bar .list-search { flex: 1; min-width: 0; }
+.kb-search-bar #kb-add-offer { flex-shrink: 0; white-space: nowrap; }
+
+.kb-type-tabs {
+  display: flex;
+  width: 100%;
+  margin-bottom: 1rem;
+}
+
+.kb-type-tabs .tab-btn {
+  flex: 1;
+  text-align: center;
+  font-weight: 600;
+}
+
 .kb-stats { margin-bottom: 1rem; }
+
+.kb-settings-stats { grid-template-columns: repeat(3, 1fr); }
+
+@media (max-width: 480px) {
+  .kb-settings-stats { gap: 8px; }
+  .kb-settings-stats .stat-item { padding: 0.625rem 0.375rem; font-size: 0.8125rem; }
+  .kb-settings-stats .stat-num { font-size: 1.125rem; }
+}
 
 .kb-section-tabs {
   display: flex;

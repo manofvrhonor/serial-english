@@ -11,12 +11,16 @@ import {
   removeStopWord,
   repairStopListTranslations,
   getAppStats,
+  addWordManual,
+  addPhraseManual,
+  addKnownWordFromImport,
+  addKnownPhraseFromImport,
 } from "../db/database.js";
-import { countDue } from "../core/srs.js";
 import { getDictionary, translate } from "../import/dictionary.js";
 import { getPhrases, translatePhrase } from "../import/phrases.js";
-import { mountWordsPanel } from "./study-words.js";
-import { mountPhrasesPanel } from "./study-phrases.js";
+import { transChipsHtml, bindTransChipsContainers } from "../ui/trans-chips.js?v=20260715";
+import { mountWordsPanel } from "./study-words.js?v=20260715";
+import { mountPhrasesPanel } from "./study-phrases.js?v=20260715";
 import { bindScrollTop } from "../ui/scroll-top.js";
 
 let section = "studying";
@@ -24,6 +28,9 @@ let subTab = "words";
 let query = "";
 let wordsPanel = null;
 let phrasesPanel = null;
+let kbAddModalReady = false;
+let kbAddPageEl = null;
+let kbAddCtx = null;
 
 export function renderKnowledge(el, ctx) {
   section = "studying";
@@ -36,7 +43,6 @@ export function renderKnowledge(el, ctx) {
 
 function draw(el, ctx) {
   const stats = getAppStats(ctx.state);
-  const due = countDue(ctx.state);
   const stopWords = filterStopItems(getStopListWords(ctx.state), query);
 
   const learnedWords = filterItems(
@@ -46,24 +52,12 @@ function draw(el, ctx) {
   );
   const learnedPhrases = filterItems(getKnowledgePhrases(ctx.state), query, (x) => x.text);
 
-  const studyingWordsCount = stats.activeWords;
-  const studyingPhrasesCount = stats.activePhrases;
-  const stopCount = (ctx.state.settings?.stopList || []).length;
-
   el.innerHTML = `
     <div class="page">
     <h1 class="view-title view-title-section">База знаний</h1>
-    <p class="view-subtitle">Слова и выражения, выученное, стоп-лист и статистика.</p>
 
-    <section class="card card-padded settings-card kb-stats">
-      <h2 class="settings-heading">База</h2>
-      <div class="settings-stats">
-        <div class="stat-item"><span class="stat-num">${stats.words}</span> слов</div>
-        <div class="stat-item"><span class="stat-num">${stats.phrases}</span> выражений</div>
-        <div class="stat-item"><span class="stat-num">${stats.learnedWords + stats.learnedPhrases}</span> выучено</div>
-        <div class="stat-item"><span class="stat-num">${due}</span> к повторению</div>
-      </div>
-    </section>
+    ${typeTabsHtml()}
+    ${statsCardHtml(subTab, stats)}
 
     <div class="tabs kb-section-tabs" id="kb-section-tabs">
       <button type="button" class="tab-btn${section === "studying" ? " active" : ""}" data-section="studying">На изучении</button>
@@ -71,15 +65,7 @@ function draw(el, ctx) {
       <button type="button" class="tab-btn${section === "stoplist" ? " active" : ""}" data-section="stoplist">Стоп-лист</button>
     </div>
 
-    ${section === "stoplist" ? stopListToolbar() : listToolbar()}
-
-    <div class="list-summary" id="kb-summary">${summaryHtml(section, subTab, {
-      studyingWordsCount,
-      studyingPhrasesCount,
-      learnedWordsCount: learnedWords.length,
-      learnedPhrasesCount: learnedPhrases.length,
-      stopCount,
-    })}</div>
+    ${toolbarHtml(ctx)}
 
     <div id="kb-content"></div>
     </div>
@@ -92,37 +78,31 @@ function draw(el, ctx) {
     if (section === "studying") {
       if (subTab === "words" && wordsPanel) wordsPanel.setQuery(query);
       if (subTab === "phrases" && phrasesPanel) phrasesPanel.setQuery(query);
-      updateSummary(el, section, subTab, {
-        studyingWordsCount: wordsPanel?.getCount() ?? studyingWordsCount,
-        studyingPhrasesCount: phrasesPanel?.getCount() ?? studyingPhrasesCount,
-      });
+      updateAddOfferButton(el, ctx);
     } else {
       draw(el, ctx);
     }
   });
 
-  el.querySelectorAll("#kb-section-tabs .tab-btn").forEach((btn) => {
-    btn.addEventListener("click", () => {
-      section = btn.dataset.section;
-      if (section === "stoplist") subTab = "words";
-      draw(el, ctx);
-    });
-  });
-
-  el.querySelectorAll("#kb-subtabs .tab-btn").forEach((btn) => {
+  el.querySelectorAll("#kb-type-tabs .tab-btn").forEach((btn) => {
     btn.addEventListener("click", () => {
       subTab = btn.dataset.tab;
       draw(el, ctx);
     });
   });
 
-  el.querySelector("#kb-add")?.addEventListener("click", () => {
-    if (subTab === "words") wordsPanel?.openAddForm();
-    else phrasesPanel?.openAddForm();
+  el.querySelectorAll("#kb-section-tabs .tab-btn").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      section = btn.dataset.section;
+      draw(el, ctx);
+    });
   });
+
+  bindSearchToolbar(el, ctx);
 
   if (section === "studying") {
     mountStudying(content, ctx, el);
+    updateAddOfferButton(el, ctx);
   } else if (section === "learned") {
     content.innerHTML = subTab === "words"
       ? learnedWordsTable(learnedWords)
@@ -130,22 +110,20 @@ function draw(el, ctx) {
     bindLearnedActions(el, ctx);
     enrichLearnedTranslations(ctx, el);
   } else {
-    content.innerHTML = stopListTable(stopWords);
-    bindStopListActions(el, ctx);
-    enrichStopListTranslations(ctx, el);
+    content.innerHTML = subTab === "words"
+      ? stopListTable(stopWords)
+      : stopListPhrasesTable();
+    if (subTab === "words") {
+      bindStopListActions(el, ctx);
+      enrichStopListTranslations(ctx, el);
+    }
   }
 
   bindScrollTop();
 }
 
 function mountStudying(content, ctx, rootEl) {
-  const onChange = () => {
-    const stats = getAppStats(ctx.state);
-    updateSummary(rootEl, section, subTab, {
-      studyingWordsCount: stats.activeWords,
-      studyingPhrasesCount: stats.activePhrases,
-    });
-  };
+  const onChange = () => {};
 
   if (subTab === "words") {
     wordsPanel = mountWordsPanel(content, ctx, { prefix: "kw", query, onChange });
@@ -154,56 +132,196 @@ function mountStudying(content, ctx, rootEl) {
   }
 }
 
-function listToolbar() {
+function typeTabsHtml() {
   return `
-    <div class="list-toolbar">
-      <input type="search" id="k-search" class="list-search"
-        placeholder="Поиск…" value="${esc(query)}" />
-      <div class="tabs" id="kb-subtabs">
-        <button type="button" class="tab-btn${subTab === "words" ? " active" : ""}" data-tab="words">Слова</button>
-        <button type="button" class="tab-btn${subTab === "phrases" ? " active" : ""}" data-tab="phrases">Выражения</button>
-      </div>
-      ${section === "studying" ? `<button type="button" id="kb-add" class="btn btn-sm">+ Добавить</button>` : ""}
+    <div class="tabs kb-type-tabs" id="kb-type-tabs">
+      <button type="button" class="tab-btn${subTab === "words" ? " active" : ""}" data-tab="words">Слова</button>
+      <button type="button" class="tab-btn${subTab === "phrases" ? " active" : ""}" data-tab="phrases">Выражения</button>
     </div>`;
 }
 
-function stopListToolbar() {
+function statsCardHtml(tab, stats) {
+  if (tab === "words") {
+    return `
+      <section class="card card-padded settings-card kb-stats">
+        <div class="settings-stats kb-settings-stats">
+          <div class="stat-item"><span class="stat-num">${stats.words}</span> слов</div>
+          <div class="stat-item"><span class="stat-num">${stats.learnedWords}</span> выучено</div>
+          <div class="stat-item"><span class="stat-num">${stats.activeWords}</span> к повторению</div>
+        </div>
+      </section>`;
+  }
   return `
-    <div class="list-toolbar">
-      <input type="search" id="k-search" class="list-search"
-        placeholder="Поиск по слову или переводу…" value="${esc(query)}" />
-      <button type="button" id="stop-add-open" class="btn btn-sm">+ Добавить</button>
-    </div>
-    <div id="stop-add-form" class="list-add-form" hidden>
-      <input type="text" id="stop-new" placeholder="Слово (english)" />
-      <button type="button" id="stop-add-btn" class="btn btn-sm">Сохранить</button>
-      <button type="button" id="stop-add-cancel" class="btn secondary btn-sm">Отмена</button>
-    </div>
-    <p id="stop-msg" class="settings-msg"></p>`;
+    <section class="card card-padded settings-card kb-stats">
+      <div class="settings-stats kb-settings-stats">
+        <div class="stat-item"><span class="stat-num">${stats.phrases}</span> выражений</div>
+        <div class="stat-item"><span class="stat-num">${stats.learnedPhrases}</span> выучено</div>
+        <div class="stat-item"><span class="stat-num">${stats.activePhrases}</span> к повторению</div>
+      </div>
+    </section>`;
 }
 
-function summaryHtml(section, tab, counts) {
+function canAddInSection() {
+  return section === "studying"
+    || section === "learned"
+    || (section === "stoplist" && subTab === "words");
+}
+
+function countFilteredItems(ctx, q) {
   if (section === "studying") {
-    const n = tab === "words" ? counts.studyingWordsCount : counts.studyingPhrasesCount;
-    return `${tab === "words" ? "Слов" : "Выражений"} на изучении: <b>${n}</b>`;
+    if (subTab === "words") return filterStudyingWords(ctx.state, q).length;
+    return filterStudyingPhrases(ctx.state, q).length;
   }
   if (section === "learned") {
-    const n = tab === "words" ? counts.learnedWordsCount : counts.learnedPhrasesCount;
-    return `${tab === "words" ? "Слов" : "Выражений"} выучено: <b>${n}</b>`;
+    const items = subTab === "words"
+      ? getKnowledgeWords(ctx.state).filter((w) => !w.inStopList)
+      : getKnowledgePhrases(ctx.state);
+    const key = subTab === "words" ? (x) => x.lemma : (x) => x.text;
+    return filterItems(items, q, key).length;
   }
-  return `В стоп-листе: <b>${counts.stopCount}</b> слов`;
+  if (section === "stoplist" && subTab === "words") {
+    return filterStopItems(getStopListWords(ctx.state), q).length;
+  }
+  return 0;
 }
 
-function updateSummary(rootEl, sec, tab, partial) {
-  const summary = rootEl.querySelector("#kb-summary");
-  if (!summary) return;
-  summary.innerHTML = summaryHtml(sec, tab, {
-    studyingWordsCount: partial.studyingWordsCount ?? 0,
-    studyingPhrasesCount: partial.studyingPhrasesCount ?? 0,
-    learnedWordsCount: 0,
-    learnedPhrasesCount: 0,
-    stopCount: 0,
+function shouldShowAddOffer(ctx, q) {
+  if (!canAddInSection()) return false;
+  const s = String(q ?? "").trim();
+  if (!s) return false;
+  return countFilteredItems(ctx, q) === 0;
+}
+
+function filterStudyingWords(state, q) {
+  const needle = q.toLowerCase().trim();
+  return (state.words || []).filter((w) => {
+    if (w.learned) return false;
+    if (!needle) return true;
+    if (w.lemma.toLowerCase().includes(needle)) return true;
+    return (w.translations || []).some((t) => t.toLowerCase().includes(needle));
   });
+}
+
+function filterStudyingPhrases(state, q) {
+  const needle = q.toLowerCase().trim();
+  return (state.phrases || []).filter((p) => {
+    if (p.learned) return false;
+    if (!needle) return true;
+    if (p.text.toLowerCase().includes(needle)) return true;
+    return (p.translations || []).some((t) => t.toLowerCase().includes(needle));
+  });
+}
+
+function toolbarHtml(ctx) {
+  const showAdd = shouldShowAddOffer(ctx, query);
+  return `
+    <div class="list-toolbar kb-search-bar">
+      <input type="search" id="k-search" class="list-search"
+        placeholder="Поиск…" value="${esc(query)}" />
+      <button type="button" id="kb-add-offer" class="btn btn-sm"${showAdd ? "" : " hidden"}>Добавить</button>
+    </div>`;
+}
+
+function bindSearchToolbar(el, ctx) {
+  el.querySelector("#kb-add-offer")?.addEventListener("click", () => {
+    openKbAddModal(el, ctx, query.trim());
+  });
+}
+
+function updateAddOfferButton(el, ctx) {
+  const btn = el.querySelector("#kb-add-offer");
+  if (!btn) return;
+  btn.hidden = !shouldShowAddOffer(ctx, query);
+}
+
+function ensureKbAddModal() {
+  if (kbAddModalReady) return;
+  kbAddModalReady = true;
+
+  document.getElementById("kb-add-backdrop")?.addEventListener("click", closeKbAddModal);
+  document.getElementById("kb-modal-cancel")?.addEventListener("click", closeKbAddModal);
+  document.getElementById("kb-modal-save")?.addEventListener("click", () => {
+    if (kbAddPageEl && kbAddCtx) saveKbAddModal(kbAddPageEl, kbAddCtx);
+  });
+
+  const chipWrap = document.getElementById("kb-modal-trans-chips");
+  if (chipWrap) {
+    bindTransChipsContainers(chipWrap, { onChange() {} });
+  }
+}
+
+async function openKbAddModal(pageEl, ctx, prefilledText) {
+  kbAddPageEl = pageEl;
+  kbAddCtx = ctx;
+  ensureKbAddModal();
+
+  const modal = document.getElementById("kb-add-modal");
+  const isPhrase = subTab === "phrases";
+  const text = String(prefilledText ?? "").trim();
+
+  document.getElementById("kb-add-title").textContent = isPhrase ? "Добавить выражение" : "Добавить слово";
+  document.getElementById("kb-modal-field-label").textContent = isPhrase ? "Выражение" : "Слово";
+  const input = document.getElementById("kb-modal-text");
+  input.value = text;
+
+  let trans = [];
+  try {
+    if (isPhrase) {
+      trans = translatePhrase(text, await getPhrases());
+    } else if (text) {
+      trans = translate(text, await getDictionary());
+    }
+  } catch (err) {
+    console.warn("Не удалось загрузить переводы:", err);
+  }
+
+  const chipWrap = document.getElementById("kb-modal-trans-chips");
+  chipWrap.innerHTML = transChipsHtml(trans, { id: "kb-modal" });
+
+  modal.hidden = false;
+  input.focus();
+  input.select();
+}
+
+function closeKbAddModal() {
+  const modal = document.getElementById("kb-add-modal");
+  if (modal) modal.hidden = true;
+}
+
+function readModalTranslations() {
+  const chipBox = document.querySelector("#kb-modal-trans-chips .trans-chips");
+  if (!chipBox) return [];
+  return [...chipBox.querySelectorAll(".trans-chip-text")]
+    .map((n) => n.textContent.trim())
+    .filter(Boolean);
+}
+
+function saveKbAddModal(pageEl, ctx) {
+  const text = document.getElementById("kb-modal-text")?.value.trim();
+  if (!text) {
+    alert(subTab === "phrases" ? "Введите выражение." : "Введите слово.");
+    return;
+  }
+
+  const trans = readModalTranslations();
+
+  if (section === "studying") {
+    if (subTab === "words") addWordManual(ctx.state, { lemma: text, translations: trans });
+    else addPhraseManual(ctx.state, { text, translations: trans });
+  } else if (section === "learned") {
+    if (subTab === "words") addKnownWordFromImport(ctx.state, { lemma: text, translations: trans, manual: true });
+    else addKnownPhraseFromImport(ctx.state, { text, translations: trans });
+  } else if (section === "stoplist") {
+    if (!addStopWord(ctx.state, text, trans)) {
+      alert("Слово уже в стоп-листе");
+      return;
+    }
+  }
+
+  ctx.save();
+  closeKbAddModal();
+  query = "";
+  draw(pageEl, ctx);
 }
 
 function learnedWordsTable(words) {
@@ -233,6 +351,13 @@ function learnedPhrasesTable(phrases) {
           <tbody>${phrases.map((p) => learnedPhraseRow(p)).join("")}</tbody>
         </table>
       </div>
+    </div>`;
+}
+
+function stopListPhrasesTable() {
+  return `
+    <div class="card list-card">
+      <div class="list-empty">Нет выражений в стоп-листе. Стоп-лист используется для отдельных слов.</div>
     </div>`;
 }
 
@@ -368,38 +493,6 @@ function bindLearnedActions(el, ctx) {
 }
 
 function bindStopListActions(el, ctx) {
-  el.querySelector("#stop-add-open")?.addEventListener("click", () => {
-    const form = el.querySelector("#stop-add-form");
-    if (form) form.hidden = false;
-    el.querySelector("#stop-new")?.focus();
-  });
-
-  el.querySelector("#stop-add-cancel")?.addEventListener("click", () => {
-    const form = el.querySelector("#stop-add-form");
-    if (form) form.hidden = true;
-    const inp = el.querySelector("#stop-new");
-    if (inp) inp.value = "";
-  });
-
-  el.querySelector("#stop-add-btn")?.addEventListener("click", () => {
-    const inp = el.querySelector("#stop-new");
-    const word = inp?.value.trim();
-    if (!word) return;
-    if (addStopWord(ctx.state, word)) {
-      ctx.save();
-      inp.value = "";
-      el.querySelector("#stop-add-form").hidden = true;
-      flashStop(el, `«${word}» добавлено в стоп-лист`);
-      draw(el, ctx);
-    } else {
-      flashStop(el, "Слово уже в стоп-листе", true);
-    }
-  });
-
-  el.querySelector("#stop-new")?.addEventListener("keydown", (e) => {
-    if (e.key === "Enter") el.querySelector("#stop-add-btn")?.click();
-  });
-
   el.querySelectorAll("[data-act]").forEach((btn) => {
     btn.addEventListener("click", () => {
       const act = btn.dataset.act;
@@ -415,13 +508,6 @@ function bindStopListActions(el, ctx) {
       draw(el, ctx);
     });
   });
-}
-
-function flashStop(el, text, isError = false) {
-  const msg = el.querySelector("#stop-msg");
-  if (!msg) return;
-  msg.textContent = text;
-  msg.className = `settings-msg ${isError ? "settings-msg-err" : "settings-msg-ok"}`;
 }
 
 function filterItems(items, q, getKey) {
