@@ -395,6 +395,23 @@ textarea:focus-visible {
   border-color: var(--ring);
 }
 
+.btn:focus-visible,
+.tab-btn:focus-visible,
+.segment-btn:focus-visible,
+.mode-btn:focus-visible,
+.train-option:focus-visible,
+.btn-icon-only:focus-visible,
+.menu-item:focus-visible,
+.mobile-nav-item:focus-visible {
+  outline: 2px solid var(--ring);
+  outline-offset: 2px;
+}
+
+.mode-btn:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
 /* ===== Import ===== */
 .import-upload {
   margin: 0 0 1rem;
@@ -578,6 +595,13 @@ textarea:focus-visible {
 }
 
 .import-committed { max-width: 40rem; }
+.import-done-hint { margin: 0.75rem 0 0; font-size: 0.875rem; line-height: 1.5; }
+.import-done-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin-top: 1rem;
+}
 
 .import-confirm-section { margin-bottom: 0.75rem; }
 
@@ -1229,8 +1253,16 @@ textarea:focus-visible {
 }
 
 .kb-stats { margin-bottom: 1rem; }
+#kb-filter-notrans.active {
+  background: var(--primary);
+  color: var(--primary-foreground);
+  border-color: var(--primary);
+}
 
-.kb-settings-stats { grid-template-columns: repeat(3, 1fr); }
+.kb-settings-stats { grid-template-columns: repeat(4, 1fr); }
+@media (max-width: 640px) {
+  .kb-settings-stats { grid-template-columns: repeat(2, 1fr); }
+}
 
 @media (max-width: 480px) {
   .kb-settings-stats { gap: 8px; }

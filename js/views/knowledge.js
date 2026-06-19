@@ -18,15 +18,17 @@ import {
 } from "../db/database.js";
 import { getDictionary, translate } from "../import/dictionary.js";
 import { getPhrases, translatePhrase } from "../import/phrases.js";
-import { transChipsHtml, bindTransChipsContainers } from "../ui/trans-chips.js?v=20260715";
+import { transChipsHtml, bindTransChipsContainers } from "../ui/trans-chips.js?v=20260721";
 import { btnReturnStudy, btnStopList, btnDeleteWord, btnRemove } from "../ui/action-icons.js";
-import { mountWordsPanel } from "./study-words.js?v=20260718";
-import { mountPhrasesPanel } from "./study-phrases.js?v=20260718";
+import { countTrainingItems } from "../core/srs.js";
+import { mountWordsPanel } from "./study-words.js?v=20260721";
+import { mountPhrasesPanel } from "./study-phrases.js?v=20260721";
 import { bindScrollTop } from "../ui/scroll-top.js";
 
 let section = "studying";
 let subTab = "words";
 let query = "";
+let filterNoTrans = false;
 let wordsPanel = null;
 let phrasesPanel = null;
 let kbAddModalReady = false;
@@ -37,22 +39,19 @@ export function renderKnowledge(el, ctx) {
   section = "studying";
   subTab = "words";
   query = "";
+  filterNoTrans = false;
   wordsPanel = null;
   phrasesPanel = null;
   draw(el, ctx);
 }
 
 function draw(el, ctx) {
-  const stats = getAppStats(ctx.state);
-  const stopWords = filterStopItems(getStopListWords(ctx.state), query);
-
-  const learnedWords = filterItems(
-    getKnowledgeWords(ctx.state).filter((w) => !w.inStopList),
-    query,
-    (x) => x.lemma
-  );
-  const learnedPhrases = filterItems(getKnowledgePhrases(ctx.state), query, (x) => x.text);
-
+  const baseStats = getAppStats(ctx.state);
+  const stats = {
+    ...baseStats,
+    dueWords: countTrainingItems(ctx.state, { content: "words", direction: "both", dueOnly: true }),
+    duePhrases: countTrainingItems(ctx.state, { content: "phrases", direction: "both", dueOnly: true }),
+  };
   el.innerHTML = `
     <div class="page">
     <h1 class="view-title view-title-section">База знаний</h1>
@@ -66,13 +65,11 @@ function draw(el, ctx) {
       <button type="button" class="tab-btn${section === "stoplist" ? " active" : ""}" data-section="stoplist">Стоп-лист</button>
     </div>
 
-    ${toolbarHtml(ctx)}
+    ${toolbarHtml(ctx, stats)}
 
     <div id="kb-content"></div>
     </div>
   `;
-
-  const content = el.querySelector("#kb-content");
 
   el.querySelector("#k-search")?.addEventListener("input", (e) => {
     query = e.target.value;
@@ -81,13 +78,14 @@ function draw(el, ctx) {
       if (subTab === "phrases" && phrasesPanel) phrasesPanel.setQuery(query);
       updateAddOfferButton(el, ctx);
     } else {
-      draw(el, ctx);
+      refreshKbList(el, ctx);
     }
   });
 
   el.querySelectorAll("#kb-type-tabs .tab-btn").forEach((btn) => {
     btn.addEventListener("click", () => {
       subTab = btn.dataset.tab;
+      filterNoTrans = false;
       draw(el, ctx);
     });
   });
@@ -95,41 +93,72 @@ function draw(el, ctx) {
   el.querySelectorAll("#kb-section-tabs .tab-btn").forEach((btn) => {
     btn.addEventListener("click", () => {
       section = btn.dataset.section;
+      filterNoTrans = false;
       draw(el, ctx);
     });
   });
 
   bindSearchToolbar(el, ctx);
+  bindNoTransFilter(el, ctx);
+
+  renderKbContent(el, ctx);
+
+  bindScrollTop();
+}
+
+function renderKbContent(el, ctx) {
+  const content = el.querySelector("#kb-content");
+  if (!content) return;
 
   if (section === "studying") {
     mountStudying(content, ctx, el);
     updateAddOfferButton(el, ctx);
-  } else if (section === "learned") {
+    return;
+  }
+
+  if (section === "learned") {
+    const learnedWords = filterItems(
+      getKnowledgeWords(ctx.state).filter((w) => !w.inStopList),
+      query,
+      (x) => x.lemma
+    );
+    const learnedPhrases = filterItems(getKnowledgePhrases(ctx.state), query, (x) => x.text);
     content.innerHTML = subTab === "words"
       ? learnedWordsTable(learnedWords)
       : learnedPhrasesTable(learnedPhrases);
     bindLearnedActions(el, ctx);
     enrichLearnedTranslations(ctx, el);
-  } else {
-    content.innerHTML = subTab === "words"
-      ? stopListTable(stopWords)
-      : stopListPhrasesTable();
-    if (subTab === "words") {
-      bindStopListActions(el, ctx);
-      enrichStopListTranslations(ctx, el);
-    }
+    updateAddOfferButton(el, ctx);
+    return;
   }
 
-  bindScrollTop();
+  const stopWords = filterStopItems(getStopListWords(ctx.state), query);
+  content.innerHTML = subTab === "words"
+    ? stopListTable(stopWords)
+    : stopListPhrasesTable();
+  if (subTab === "words") {
+    bindStopListActions(el, ctx);
+    enrichStopListTranslations(ctx, el);
+  }
+  updateAddOfferButton(el, ctx);
+}
+
+function refreshKbList(el, ctx) {
+  if (section === "studying") return;
+  renderKbContent(el, ctx);
 }
 
 function mountStudying(content, ctx, rootEl) {
   const onChange = () => {};
 
   if (subTab === "words") {
-    wordsPanel = mountWordsPanel(content, ctx, { prefix: "kw", query, onChange });
+    wordsPanel = mountWordsPanel(content, ctx, {
+      prefix: "kw", query, filterNoTrans, onChange,
+    });
   } else {
-    phrasesPanel = mountPhrasesPanel(content, ctx, { prefix: "kp", query, onChange });
+    phrasesPanel = mountPhrasesPanel(content, ctx, {
+      prefix: "kp", query, filterNoTrans, onChange,
+    });
   }
 }
 
@@ -148,7 +177,8 @@ function statsCardHtml(tab, stats) {
         <div class="settings-stats kb-settings-stats">
           <div class="stat-item"><span class="stat-num">${stats.words}</span> слов</div>
           <div class="stat-item"><span class="stat-num">${stats.learnedWords}</span> выучено</div>
-          <div class="stat-item"><span class="stat-num">${stats.activeWords}</span> к повторению</div>
+          <div class="stat-item"><span class="stat-num">${stats.studyingWords}</span> в работе</div>
+          <div class="stat-item"><span class="stat-num">${stats.dueWords}</span> к повторению сегодня</div>
         </div>
       </section>`;
   }
@@ -157,7 +187,8 @@ function statsCardHtml(tab, stats) {
       <div class="settings-stats kb-settings-stats">
         <div class="stat-item"><span class="stat-num">${stats.phrases}</span> выражений</div>
         <div class="stat-item"><span class="stat-num">${stats.learnedPhrases}</span> выучено</div>
-        <div class="stat-item"><span class="stat-num">${stats.activePhrases}</span> к повторению</div>
+        <div class="stat-item"><span class="stat-num">${stats.studyingPhrases}</span> в работе</div>
+        <div class="stat-item"><span class="stat-num">${stats.duePhrases}</span> к повторению сегодня</div>
       </div>
     </section>`;
 }
@@ -170,8 +201,8 @@ function canAddInSection() {
 
 function countFilteredItems(ctx, q) {
   if (section === "studying") {
-    if (subTab === "words") return filterStudyingWords(ctx.state, q).length;
-    return filterStudyingPhrases(ctx.state, q).length;
+    if (subTab === "words") return filterStudyingWords(ctx.state, q, filterNoTrans).length;
+    return filterStudyingPhrases(ctx.state, q, filterNoTrans).length;
   }
   if (section === "learned") {
     const items = subTab === "words"
@@ -193,34 +224,56 @@ function shouldShowAddOffer(ctx, q) {
   return countFilteredItems(ctx, q) === 0;
 }
 
-function filterStudyingWords(state, q) {
+function filterStudyingWords(state, q, noTransOnly = false) {
   const needle = q.toLowerCase().trim();
   return (state.words || []).filter((w) => {
     if (w.learned) return false;
+    if (noTransOnly && (w.translations || []).some(Boolean)) return false;
     if (!needle) return true;
     if (w.lemma.toLowerCase().includes(needle)) return true;
     return (w.translations || []).some((t) => t.toLowerCase().includes(needle));
   });
 }
 
-function filterStudyingPhrases(state, q) {
+function filterStudyingPhrases(state, q, noTransOnly = false) {
   const needle = q.toLowerCase().trim();
   return (state.phrases || []).filter((p) => {
     if (p.learned) return false;
+    if (noTransOnly && (p.translations || []).some(Boolean)) return false;
     if (!needle) return true;
     if (p.text.toLowerCase().includes(needle)) return true;
     return (p.translations || []).some((t) => t.toLowerCase().includes(needle));
   });
 }
 
-function toolbarHtml(ctx) {
+function noTransCount(stats) {
+  return subTab === "words" ? stats.noTransWords : stats.noTransPhrases;
+}
+
+function toolbarHtml(ctx, stats) {
   const showAdd = shouldShowAddOffer(ctx, query);
+  const noTrans = section === "studying" ? noTransCount(stats) : 0;
+  const filterBtn = noTrans
+    ? `<button type="button" id="kb-filter-notrans" class="btn btn-sm${filterNoTrans ? " active" : ""}" aria-label="Показать только без перевода">Без перевода (${noTrans})</button>`
+    : "";
   return `
     <div class="list-toolbar kb-search-bar">
       <input type="search" id="k-search" class="list-search"
         placeholder="Поиск…" value="${esc(query)}" />
+      ${filterBtn}
       <button type="button" id="kb-add-offer" class="btn btn-sm"${showAdd ? "" : " hidden"}>Добавить</button>
     </div>`;
+}
+
+function bindNoTransFilter(el, ctx) {
+  el.querySelector("#kb-filter-notrans")?.addEventListener("click", () => {
+    filterNoTrans = !filterNoTrans;
+    const btn = el.querySelector("#kb-filter-notrans");
+    if (btn) btn.classList.toggle("active", filterNoTrans);
+    if (subTab === "words" && wordsPanel) wordsPanel.setFilterNoTrans(filterNoTrans);
+    if (subTab === "phrases" && phrasesPanel) phrasesPanel.setFilterNoTrans(filterNoTrans);
+    updateAddOfferButton(el, ctx);
+  });
 }
 
 function bindSearchToolbar(el, ctx) {

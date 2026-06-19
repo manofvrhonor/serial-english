@@ -2,12 +2,12 @@ import { parseFileContent, parseFileName } from "../core/parser.js";
 import { analyzeText, analyzeSummary, analyzePhrases, phraseSummary } from "../core/analyzer.js";
 import {
   addWords, addPhrases, addStopWord, addKnownWordFromImport, addKnownPhraseFromImport,
-  resolveImportSource,
+  resolveImportSource, getAppStats,
 } from "../db/database.js";
 import { getDictionary, getFormsIndex, translate, translatorUrl } from "../import/dictionary.js";
 import { getPhrases, translatePhrase } from "../import/phrases.js";
 import { attachSwipeCard } from "../ui/swipe-card.js";
-import { transChipsHtml, bindTransChipsContainers } from "../ui/trans-chips.js?v=20260714";
+import { transChipsHtml, bindTransChipsContainers } from "../ui/trans-chips.js?v=20260721";
 import { refreshPageScrollTop, unbindScrollTop } from "../ui/scroll-top.js";
 import { btnLearned, btnStopList } from "../ui/action-icons.js";
 
@@ -867,7 +867,6 @@ function handleRowAction(el, ctx, btn, kind) {
       wordRes: { added: session.totals.wordAdded, updated: session.totals.wordUpdated },
       phraseRes: { added: session.totals.phraseAdded, updated: session.totals.phraseUpdated },
       label: session.totals.label,
-      noTrans: 0,
     });
     return;
   }
@@ -935,7 +934,6 @@ function commit(el, ctx) {
       wordRes: { added: session.totals.wordAdded, updated: session.totals.wordUpdated },
       phraseRes: { added: session.totals.phraseAdded, updated: session.totals.phraseUpdated },
       label: session.totals.label,
-      noTrans: 0,
     });
     return;
   }
@@ -955,9 +953,13 @@ function resetImportFileForm(el) {
   if (fileInput) fileInput.value = "";
 }
 
-function renderCommitted(el, ctx, { wordRes, phraseRes, label, noTrans }) {
+function renderCommitted(el, ctx, { wordRes, phraseRes, label }) {
   const box = el.querySelector("#import-result");
   if (!box) return;
+
+  const stats = getAppStats(ctx.state);
+  const noTrans = stats.noTransWords + stats.noTransPhrases;
+  const addedTotal = wordRes.added + wordRes.updated + phraseRes.added + phraseRes.updated;
 
   resetImportFileForm(el);
   session = null;
@@ -972,9 +974,21 @@ function renderCommitted(el, ctx, { wordRes, phraseRes, label, noTrans }) {
         Слова: <b>+${wordRes.added}</b> / обновлено <b>${wordRes.updated}</b>.
         Выражения: <b>+${phraseRes.added}</b> / обновлено <b>${phraseRes.updated}</b>.
         Источник: <b>${esc(label || "—")}</b>
-        ${noTrans ? `<br><span class="c-missing">${noTrans} без перевода — дополните в «База знаний → На изучении».</span>` : ""}
+        ${noTrans ? `<p class="import-done-hint c-missing">${noTrans} без перевода — дополните в «База знаний → На изучении» (фильтр «Без перевода»).</p>` : ""}
       </div>
+      ${(noTrans || addedTotal) ? `
+      <div class="import-done-actions">
+        ${noTrans ? `<button type="button" id="import-go-knowledge" class="btn btn-sm">Дополнить переводы</button>` : ""}
+        ${addedTotal ? `<button type="button" id="import-go-training" class="btn btn-sm outline">К тренировке</button>` : ""}
+      </div>` : ""}
     </div>`;
+
+  el.querySelector("#import-go-knowledge")?.addEventListener("click", () => {
+    ctx.navigateTo?.("knowledge");
+  });
+  el.querySelector("#import-go-training")?.addEventListener("click", () => {
+    ctx.navigateTo?.("training");
+  });
 }
 
 function showError(el, msg) {

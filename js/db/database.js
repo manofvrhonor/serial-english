@@ -64,11 +64,6 @@ function normalizeStopList(list) {
   return [...seen.values()].sort((a, b) => a.lemma.localeCompare(b.lemma));
 }
 
-/** @deprecated use normalizeStopList */
-function stripBuiltinStopWords(list) {
-  return normalizeStopList(list);
-}
-
 // ---------- Генератор id ----------
 export function makeId(prefix = "id") {
   return `${prefix}_${Math.random().toString(36).slice(2, 8)}${Date.now().toString(36).slice(-3)}`;
@@ -1015,11 +1010,17 @@ export function isTrainableItem(item) {
 export function getAppStats(state) {
   const words = state.words || [];
   const phrases = state.phrases || [];
+  const studyingWords = words.filter((w) => !w.learned);
+  const studyingPhrases = phrases.filter((p) => !p.learned);
   return {
     words: words.length,
     phrases: phrases.length,
     learnedWords: words.filter((w) => w.learned).length,
     learnedPhrases: phrases.filter((p) => p.learned).length,
+    studyingWords: studyingWords.length,
+    studyingPhrases: studyingPhrases.length,
+    noTransWords: studyingWords.filter((w) => !(w.translations || []).some(Boolean)).length,
+    noTransPhrases: studyingPhrases.filter((p) => !(p.translations || []).some(Boolean)).length,
     activeWords: words.filter(isTrainableItem).length,
     activePhrases: phrases.filter(isTrainableItem).length,
     shows: (state.shows || []).length,

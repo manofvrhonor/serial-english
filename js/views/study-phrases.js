@@ -3,18 +3,18 @@ import {
   deletePhrase,
   markPhraseLearned,
 } from "../db/database.js";
-import { transChipsHtml, bindTransChipsContainers } from "../ui/trans-chips.js?v=20260715";
-import { openSourcesModal } from "../ui/sources-modal.js?v=20260715";
+import { transChipsHtml, bindTransChipsContainers } from "../ui/trans-chips.js?v=20260721";
+import { openSourcesModal } from "../ui/sources-modal.js?v=20260721";
 import { btnLearned, btnDeleteWord, btnSources } from "../ui/action-icons.js";
 
 import { bindScrollTop } from "../ui/scroll-top.js";
 
 export function mountPhrasesPanel(mountEl, ctx, options = {}) {
-  const panel = { query: options.query ?? "" };
+  const panel = { query: options.query ?? "", filterNoTrans: options.filterNoTrans ?? false };
   const prefix = options.prefix ?? "p";
 
   function draw() {
-    const phrases = getFilteredPhrases(ctx.state, panel.query);
+    const phrases = getFilteredPhrases(ctx.state, panel.query, panel.filterNoTrans);
 
     mountEl.innerHTML = `
       <div class="card list-card">
@@ -46,13 +46,18 @@ export function mountPhrasesPanel(mountEl, ctx, options = {}) {
       panel.query = q;
       draw();
     },
+    setFilterNoTrans(v) {
+      panel.filterNoTrans = v;
+      draw();
+    },
   };
 }
 
-function getFilteredPhrases(state, q) {
+function getFilteredPhrases(state, q, filterNoTrans = false) {
   const query = q.toLowerCase().trim();
   return state.phrases.filter((p) => {
     if (p.learned) return false;
+    if (filterNoTrans && (p.translations || []).some(Boolean)) return false;
     if (!query) return true;
     const inText = p.text.toLowerCase().includes(query);
     const inTrans = (p.translations || []).some((t) => t.toLowerCase().includes(query));

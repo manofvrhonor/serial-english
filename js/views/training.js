@@ -1,6 +1,8 @@
 import {
   buildSession, prepareCard, resolveMode, applyAnswer,
   countTrainingItems, directionLabel, modeLabel,
+  TRAINING_MODE_LABELS, TRAINING_MODE_HINTS, TRAINING_MODE_ORDER,
+  canUseChoiceMode,
 } from "../core/srs.js";
 import {
   recordSessionSummary,
@@ -22,20 +24,6 @@ const setupDefaults = {
 };
 
 let setup = { ...setupDefaults };
-
-const MODE_LABELS = {
-  2: "Открыть перевод",
-  1: "Слово + перевод",
-  3: "Выбор из 4-х",
-  mix: "Смешанный",
-};
-
-const MODE_HINTS = {
-  2: "Покажется слово, нажмите чтобы открыть перевод.",
-  1: "Слово и перевод сразу. Отметьте «Знал» или «Не знал».",
-  3: "Слово и 4 варианта перевода — выберите правильный.",
-  mix: "Каждая карточка случайно использует один из режимов.",
-};
 
 export function renderTraining(el, ctx) {
   session = null;
@@ -66,6 +54,9 @@ function renderSetup(el, ctx) {
   const dueLabel = setup.dueOnly ? "К повторению сегодня" : "Доступно для тренировки";
   const today = getTodayTrainingSummary(ctx.state);
   const history = ctx.state.settings?.sessionHistory || [];
+  const choiceOk = canUseChoiceMode(ctx.state, setup.content);
+
+  if (!choiceOk && setup.mode === "3") setup.mode = "2";
 
   el.innerHTML = `
     <div class="page train-page">
@@ -101,11 +92,17 @@ function renderSetup(el, ctx) {
         <div class="train-field">
           <div class="train-field-label">Режим карточек</div>
           <div class="mode-grid" data-segment="mode">
-            ${Object.entries(MODE_LABELS).map(([value, label]) => `
-              <button type="button" class="mode-btn ${setup.mode === value ? "active" : ""}" data-value="${value}">${label}</button>
-            `).join("")}
+            ${TRAINING_MODE_ORDER.map((value) => {
+              const disabled = value === "3" && !choiceOk;
+              return `
+              <button type="button" class="mode-btn ${setup.mode === value ? "active" : ""}"
+                data-value="${value}"${disabled ? " disabled" : ""}
+                title="${disabled ? "Нужно минимум 4 элемента с переводом" : TRAINING_MODE_LABELS[value]}">
+                ${TRAINING_MODE_LABELS[value]}
+              </button>`;
+            }).join("")}
           </div>
-          <p class="train-mode-hint" id="t-mode-hint">${MODE_HINTS[setup.mode] || ""}</p>
+          <p class="train-mode-hint" id="t-mode-hint">${TRAINING_MODE_HINTS[setup.mode] || ""}${!choiceOk ? " Режим «4 варианта» доступен при ≥4 элементах с переводом." : ""}</p>
         </div>
 
         <label class="train-due-row">
@@ -143,6 +140,7 @@ function renderSetup(el, ctx) {
     btn.addEventListener("click", () => {
       const seg = btn.closest(".segment").dataset.segment;
       setup[seg] = btn.dataset.value;
+      if (!canUseChoiceMode(ctx.state, setup.content) && setup.mode === "3") setup.mode = "2";
       renderSetup(el, ctx);
     });
   });
@@ -222,8 +220,9 @@ function currentEntry() {
 
 function renderCard(el, ctx) {
   const entry = currentEntry();
-  const mode = resolveMode(session.opts.mode);
-  const card = prepareCard(ctx.state, entry, mode);
+  const requestedMode = resolveMode(session.opts.mode);
+  const card = prepareCard(ctx.state, entry, requestedMode);
+  const mode = card.mode;
 
   session.current = { entry, mode, card };
   session.revealed = mode === 1;
@@ -279,7 +278,7 @@ function renderSessionHeader(mode, progress, dir) {
         <span class="train-badge train-badge-outline">${esc(modeLabel(mode))}</span>
         <span class="train-badge train-badge-progress">${progress}</span>
         <span class="train-badge train-badge-dir">${esc(dir)}</span>
-        <button type="button" id="t-quit" class="btn btn-ghost btn-sm train-quit">Настройки</button>
+        <button type="button" id="t-quit" class="btn btn-ghost btn-sm train-quit" aria-label="Настройки тренировки">Настройки</button>
       </div>
     </div>`;
 }
@@ -305,7 +304,8 @@ function renderOptionsBlock(card, answered, feedbackHtml = "") {
       if (isCorrect) classes.push("train-option-correct");
     }
     return `
-      <button type="button" class="${classes.join(" ")}" data-opt="${escAttr(opt)}" ${answered ? "disabled" : ""}>
+      <button type="button" class="${classes.join(" ")}" data-opt="${escAttr(opt)}"
+        aria-label="Вариант: ${escAttr(opt)}" ${answered ? "disabled" : ""}>
         ${answered && isCorrect ? ICON_CHECK : ""}${esc(opt)}
       </button>`;
   }).join("");
@@ -330,7 +330,7 @@ function renderCardBody(card, mode, revealed) {
       <div class="train-reveal-area">
         ${revealed
           ? `<div class="train-answer train-answer-visible">${esc(card.answer)}</div>`
-          : `<button type="button" id="t-reveal" class="btn btn-ghost train-reveal-btn">${ICON_EYE}Показать</button>`}
+          : `<button type="button" id="t-reveal" class="btn btn-ghost train-reveal-btn" aria-label="Показать перевод">${ICON_EYE}Показать</button>`}
       </div>`;
   }
   return renderPromptOnly(card);
@@ -345,8 +345,8 @@ function renderActions(card, mode, revealed, answered) {
     return `<p class="train-hint btn-block-row">Нажмите на карточку или «Показать»</p>`;
   }
   return `
-    <button type="button" id="t-unknown" class="btn btn-danger train-action-btn">${ICON_X}Не знал</button>
-    <button type="button" id="t-knew" class="btn train-knew train-action-btn">${ICON_CHECK}Знал</button>`;
+    <button type="button" id="t-unknown" class="btn btn-danger train-action-btn" aria-label="Не знал">${ICON_X}Не знал</button>
+    <button type="button" id="t-knew" class="btn train-knew train-action-btn" aria-label="Знал">${ICON_CHECK}Знал</button>`;
 }
 
 function bindCardEvents(el, ctx) {

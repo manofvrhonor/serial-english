@@ -3,18 +3,18 @@ import {
   deleteWord,
   markWordLearned,
 } from "../db/database.js";
-import { transChipsHtml, bindTransChipsContainers } from "../ui/trans-chips.js?v=20260715";
-import { openSourcesModal } from "../ui/sources-modal.js?v=20260715";
+import { transChipsHtml, bindTransChipsContainers } from "../ui/trans-chips.js?v=20260721";
+import { openSourcesModal } from "../ui/sources-modal.js?v=20260721";
 import { btnLearned, btnStopList, btnSources } from "../ui/action-icons.js";
 
 import { bindScrollTop } from "../ui/scroll-top.js";
 
 export function mountWordsPanel(mountEl, ctx, options = {}) {
-  const panel = { query: options.query ?? "" };
+  const panel = { query: options.query ?? "", filterNoTrans: options.filterNoTrans ?? false };
   const prefix = options.prefix ?? "w";
 
   function draw() {
-    const words = getFilteredWords(ctx.state, panel.query);
+    const words = getFilteredWords(ctx.state, panel.query, panel.filterNoTrans);
 
     mountEl.innerHTML = `
       <div class="card list-card">
@@ -46,13 +46,18 @@ export function mountWordsPanel(mountEl, ctx, options = {}) {
       panel.query = q;
       draw();
     },
+    setFilterNoTrans(v) {
+      panel.filterNoTrans = v;
+      draw();
+    },
   };
 }
 
-function getFilteredWords(state, q) {
+function getFilteredWords(state, q, filterNoTrans = false) {
   const query = q.toLowerCase().trim();
   return state.words.filter((w) => {
     if (w.learned) return false;
+    if (filterNoTrans && (w.translations || []).some(Boolean)) return false;
     if (!query) return true;
     const inLemma = w.lemma.toLowerCase().includes(query);
     const inTrans = (w.translations || []).some((t) => t.toLowerCase().includes(query));

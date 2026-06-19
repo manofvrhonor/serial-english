@@ -2,6 +2,41 @@ import { todayStr, markWordLearned, markPhraseLearned, isTrainableItem } from ".
 
 const WEIGHTS = [6, 3, 1];
 
+export function shuffleArray(items) {
+  const arr = [...items];
+  for (let i = arr.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [arr[i], arr[j]] = [arr[j], arr[i]];
+  }
+  return arr;
+}
+
+/** Не ставить подряд карточки одного слова/выражения (режим «Оба направления»). */
+export function shuffleAvoidingAdjacent(items, keyFn = (x) => x.item?.id) {
+  if (items.length <= 2) return shuffleArray(items);
+
+  const arr = shuffleArray(items);
+  for (let pass = 0; pass < arr.length * 3; pass++) {
+    let moved = false;
+    for (let i = 1; i < arr.length; i++) {
+      if (keyFn(arr[i]) === keyFn(arr[i - 1])) {
+        let swapped = false;
+        for (let j = i + 1; j < arr.length; j++) {
+          if (keyFn(arr[j]) === keyFn(arr[i - 1])) continue;
+          if (j + 1 < arr.length && keyFn(arr[j]) === keyFn(arr[j + 1])) continue;
+          [arr[i], arr[j]] = [arr[j], arr[i]];
+          swapped = true;
+          moved = true;
+          break;
+        }
+        if (!swapped) break;
+      }
+    }
+    if (!moved) break;
+  }
+  return arr;
+}
+
 export function addDays(dateStr, days) {
   const d = new Date(`${dateStr}T12:00:00`);
   d.setDate(d.getDate() + days);
@@ -37,42 +72,71 @@ function getEnglish(item, kind) {
   return kind === "word" ? item.lemma : item.text;
 }
 
-function collectPool(state, kind, direction, excludeId) {
-  const pool = [];
-  const add = (items, k) => {
-    for (const it of items) {
-      if (it.learned || it.id === excludeId) continue;
-      const trans = (it.translations || []).filter(Boolean);
-      if (!trans.length) continue;
-      if (direction === "enru") {
-        for (const t of trans) pool.push(t);
-      } else {
-        pool.push(k === "word" ? it.lemma : it.text);
-      }
+function distractorText(item, kind, direction) {
+  const trans = (item.translations || []).filter(Boolean);
+  if (!trans.length) return "";
+  if (direction === "enru") return pickWeightedTranslation(trans);
+  return kind === "word" ? item.lemma : item.text;
+}
+
+function collectDistractorCandidates(state, kind, direction, excludeId) {
+  const candidates = [];
+  const seen = new Set();
+
+  const tryAdd = (it, k) => {
+    if (it.id === excludeId) return;
+    const text = distractorText(it, k, direction);
+    if (!text) return;
+    const key = text.toLowerCase();
+    if (seen.has(key)) return;
+    seen.add(key);
+    candidates.push({ text, id: it.id });
+  };
+
+  const scan = (items, k, filterFn) => {
+    for (const it of items || []) {
+      if (!filterFn(it)) continue;
+      tryAdd(it, k);
     }
   };
-  add(state.words, "word");
-  add(state.phrases, "phrase");
-  return [...new Set(pool)];
+
+  const words = state.words || [];
+  const phrases = state.phrases || [];
+
+  if (kind === "word" || kind === "all") scan(words, "word", isTrainableItem);
+  if (kind === "phrase" || kind === "all") scan(phrases, "phrase", isTrainableItem);
+
+  if (candidates.length < 3) {
+    if (kind === "word" || kind === "all") scan(words, "word", (it) => it.learned);
+    if (kind === "phrase" || kind === "all") scan(phrases, "phrase", (it) => it.learned);
+  }
+
+  return candidates;
+}
+
+export function canUseChoiceMode(state, content = "words") {
+  const trainable = (items) => (items || []).filter(isTrainableItem).length;
+  if (content === "words") return trainable(state.words) >= 4;
+  if (content === "phrases") return trainable(state.phrases) >= 4;
+  return trainable(state.words) >= 4 && trainable(state.phrases) >= 4;
 }
 
 export function buildOptions(state, item, kind, direction, correct) {
-  const pool = collectPool(state, kind, direction, item.id)
-    .filter((x) => x.toLowerCase() !== String(correct).toLowerCase());
+  const correctKey = String(correct).toLowerCase();
+  const pool = shuffleArray(
+    collectDistractorCandidates(state, kind, direction, item.id)
+      .filter((c) => c.text.toLowerCase() !== correctKey)
+  );
 
   const wrong = [];
-  const shuffled = pool.sort(() => Math.random() - 0.5);
-  for (const w of shuffled) {
+  for (const c of pool) {
     if (wrong.length >= 3) break;
-    if (!wrong.some((x) => x.toLowerCase() === w.toLowerCase())) wrong.push(w);
+    if (!wrong.some((x) => x.toLowerCase() === c.text.toLowerCase())) wrong.push(c.text);
   }
 
-  while (wrong.length < 3) {
-    wrong.push(wrong.length === 0 ? "—" : `вариант ${wrong.length + 1}`);
-  }
+  if (wrong.length < 3) return null;
 
-  const options = [correct, ...wrong.slice(0, 3)];
-  return options.sort(() => Math.random() - 0.5);
+  return shuffleArray([correct, ...wrong.slice(0, 3)]);
 }
 
 export function prepareCard(state, entry, mode) {
@@ -83,14 +147,21 @@ export function prepareCard(state, entry, mode) {
   const prompt = direction === "enru" ? english : correctTrans;
   const answer = direction === "enru" ? correctTrans : english;
 
+  let effectiveMode = mode;
+  let options = [];
+  if (mode === 3) {
+    options = buildOptions(state, item, kind, direction, answer);
+    if (!options) effectiveMode = 2;
+  }
+
   return {
     kind,
     itemId: item.id,
     direction,
-    mode,
+    mode: effectiveMode,
     prompt,
     answer,
-    options: mode === 3 ? buildOptions(state, item, kind, direction, answer) : [],
+    options,
     label: kind === "word" ? item.lemma : item.text,
   };
 }
@@ -123,7 +194,7 @@ export function buildSession(state, opts) {
   if (content === "words" || content === "all") addItems(state.words, "word");
   if (content === "phrases" || content === "all") addItems(state.phrases, "phrase");
 
-  return entries.sort(() => Math.random() - 0.5);
+  return shuffleAvoidingAdjacent(entries);
 }
 
 export function resolveMode(sessionMode) {
@@ -203,15 +274,27 @@ export function countTrainingItems(state, opts = {}) {
   return n;
 }
 
-/** @deprecated use countTrainingItems — считал EN→RU и RU→EN отдельно */
-export function countDue(state) {
-  return countTrainingItems(state, { content: "all", direction: "both", dueOnly: true });
-}
+/** Подписи режимов карточек (setup и badge в сессии) — сверять с docs/agent-spec.md §8.1 */
+export const TRAINING_MODE_LABELS = {
+  1: "Слово + перевод",
+  2: "Перевод по клику",
+  3: "4 варианта",
+  mix: "Смешанный",
+};
+
+export const TRAINING_MODE_HINTS = {
+  1: "Слово и перевод сразу. Отметьте «Знал» или «Не знал».",
+  2: "Покажется слово — нажмите, чтобы открыть перевод.",
+  3: "Слово и 4 варианта — выберите правильный.",
+  mix: "Каждая карточка случайно в одном из трёх режимов.",
+};
+
+export const TRAINING_MODE_ORDER = ["1", "2", "3", "mix"];
 
 export function directionLabel(dir) {
   return dir === "enru" ? "EN→RU" : "RU→EN";
 }
 
 export function modeLabel(mode) {
-  return ({ 1: "Слово + перевод", 2: "Перевод по клику", 3: "4 варианта" })[mode] || "";
+  return TRAINING_MODE_LABELS[mode] || "";
 }

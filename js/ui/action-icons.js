@@ -17,30 +17,30 @@ const BTN = "btn outline btn-sm btn-icon-only";
 /** ✓ Выучено / Знаю */
 export function btnLearned(attrs, { title = "Выучено", extraClass = "" } = {}) {
   const cls = extraClass ? `${BTN} ${extraClass}` : BTN;
-  return `<button type="button" class="${cls}" ${attrs} title="${title}">${ICON_CHECK}</button>`;
+  return `<button type="button" class="${cls}" ${attrs} title="${title}" aria-label="${title}">${ICON_CHECK}</button>`;
 }
 
 /** 🚫 В стоп-лист */
 export function btnStopList(attrs, { title = "В стоп-лист" } = {}) {
-  return `<button type="button" class="${BTN} btn-icon-danger row-btn-stop" ${attrs} title="${title}">${ICON_BAN}</button>`;
+  return `<button type="button" class="${BTN} btn-icon-danger row-btn-stop" ${attrs} title="${title}" aria-label="${title}">${ICON_BAN}</button>`;
 }
 
 /** 🗑 Удалить */
 export function btnDeleteWord(attrs, { title = "Удалить слово" } = {}) {
-  return `<button type="button" class="${BTN} btn-icon-danger" ${attrs} title="${title}">${ICON_TRASH}</button>`;
+  return `<button type="button" class="${BTN} btn-icon-danger" ${attrs} title="${title}" aria-label="${title}">${ICON_TRASH}</button>`;
 }
 
 /** ✕ Убрать / исключить (не полное удаление) */
 export function btnRemove(attrs, { title = "Убрать" } = {}) {
-  return `<button type="button" class="${BTN} btn-icon-danger" ${attrs} title="${title}">${ICON_X}</button>`;
+  return `<button type="button" class="${BTN} btn-icon-danger" ${attrs} title="${title}" aria-label="${title}">${ICON_X}</button>`;
 }
 
 /** ↩ Вернуть в изучение */
 export function btnReturnStudy(attrs, { title = "Вернуть в изучение" } = {}) {
-  return `<button type="button" class="${BTN}" ${attrs} title="${title}">${ICON_RETURN}</button>`;
+  return `<button type="button" class="${BTN}" ${attrs} title="${title}" aria-label="${title}">${ICON_RETURN}</button>`;
 }
 
 /** ≡ Источники */
 export function btnSources(attrs, title, disabled = false) {
-  return `<button type="button" class="${BTN}" ${attrs} title="${title}"${disabled ? " disabled" : ""}>${ICON_SOURCES}</button>`;
+  return `<button type="button" class="${BTN}" ${attrs} title="${title}" aria-label="${title}"${disabled ? " disabled" : ""}>${ICON_SOURCES}</button>`;
 }
