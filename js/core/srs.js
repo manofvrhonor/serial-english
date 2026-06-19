@@ -1,4 +1,4 @@
-import { todayStr, markWordLearned, markPhraseLearned } from "../db/database.js";
+import { todayStr, markWordLearned, markPhraseLearned, isTrainableItem } from "../db/database.js";
 
 const WEIGHTS = [6, 3, 1];
 
@@ -107,7 +107,7 @@ export function buildSession(state, opts) {
 
   const addItems = (items, kind) => {
     for (const item of items) {
-      if (item.learned || !(item.translations || []).filter(Boolean).length) continue;
+      if (!isTrainableItem(item)) continue;
       if (!matchesSource(item)) continue;
 
       const dirs = direction === "both" ? ["enru", "ruen"] : [direction];
@@ -171,19 +171,41 @@ function checkFullyLearned(state, item, kind) {
   }
 }
 
-export function countDue(state) {
+export function countTrainingItems(state, opts = {}) {
+  const { content = "all", direction = "both", dueOnly = true, sourceId = null } = opts;
   const today = todayStr();
-  let n = 0;
-  const count = (items) => {
-    for (const item of items) {
-      if (item.learned) continue;
-      if (isDue(item.srs?.enru?.due, today)) n++;
-      if (isDue(item.srs?.ruen?.due, today)) n++;
-    }
+
+  const matchesSource = (item) => {
+    if (!sourceId) return true;
+    return (item.sources || []).includes(sourceId);
   };
-  count(state.words);
-  count(state.phrases);
+
+  const isItemIncluded = (item) => {
+    if (!isTrainableItem(item)) return false;
+    if (!matchesSource(item)) return false;
+
+    const dirs = direction === "both" ? ["enru", "ruen"] : [direction];
+    for (const dir of dirs) {
+      const side = item.srs?.[dir];
+      if (!side) continue;
+      if (!dueOnly || isDue(side.due, today)) return true;
+    }
+    return false;
+  };
+
+  let n = 0;
+  if (content === "words" || content === "all") {
+    n += (state.words || []).filter(isItemIncluded).length;
+  }
+  if (content === "phrases" || content === "all") {
+    n += (state.phrases || []).filter(isItemIncluded).length;
+  }
   return n;
+}
+
+/** @deprecated use countTrainingItems — считал EN→RU и RU→EN отдельно */
+export function countDue(state) {
+  return countTrainingItems(state, { content: "all", direction: "both", dueOnly: true });
 }
 
 export function directionLabel(dir) {

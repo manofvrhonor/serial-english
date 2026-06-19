@@ -1,8 +1,8 @@
-import { renderImport } from "./views/import.js?v=20260717";
-import { renderKnowledge } from "./views/knowledge.js?v=20260717";
-import { renderTraining } from "./views/training.js?v=20260717";
-import { renderShows } from "./views/shows.js?v=20260717";
-import { renderBooks } from "./views/books.js?v=20260717";
+import { renderImport } from "./views/import.js?v=20260718";
+import { renderKnowledge } from "./views/knowledge.js?v=20260718";
+import { renderTraining } from "./views/training.js?v=20260718";
+import { renderShows } from "./views/shows.js?v=20260718";
+import { renderBooks } from "./views/books.js?v=20260718";
 import { renderSettings } from "./views/settings.js?v=20260717";
 import { refreshPageScrollTop } from "./ui/scroll-top.js?v=20260717";
 

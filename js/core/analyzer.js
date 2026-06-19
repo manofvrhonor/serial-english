@@ -45,7 +45,7 @@ export function analyzeText(state, text, dict = null, formsIndex = null) {
 export function analyzeSummary(words) {
   return {
     total: words.length,
-    newCount: words.filter((w) => w.included).length,
+    newCount: words.filter((w) => !w.removed && !w.known && !w.stop && !w.studying).length,
     knownCount: words.filter((w) => w.known).length,
     stopCount: words.filter((w) => w.stop).length,
     studyingCount: words.filter((w) => w.studying).length,
@@ -96,7 +96,7 @@ export function analyzePhrases(state, text, dict, formsIndex, phrasesDb) {
 export function phraseSummary(phrases) {
   return {
     total: phrases.length,
-    newCount: phrases.filter((p) => p.included).length,
+    newCount: phrases.filter((p) => !p.removed && !p.known && !p.studying).length,
     knownCount: phrases.filter((p) => p.known).length,
     studyingCount: phrases.filter((p) => p.studying).length,
   };

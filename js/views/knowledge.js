@@ -8,7 +8,7 @@ import {
   excludeWordFromImport,
   excludePhraseFromImport,
   addStopWord,
-  removeStopWord,
+  purgeWord,
   repairStopListTranslations,
   getAppStats,
   addWordManual,
@@ -19,8 +19,9 @@ import {
 import { getDictionary, translate } from "../import/dictionary.js";
 import { getPhrases, translatePhrase } from "../import/phrases.js";
 import { transChipsHtml, bindTransChipsContainers } from "../ui/trans-chips.js?v=20260715";
-import { mountWordsPanel } from "./study-words.js?v=20260715";
-import { mountPhrasesPanel } from "./study-phrases.js?v=20260715";
+import { btnReturnStudy, btnStopList, btnDeleteWord, btnRemove } from "../ui/action-icons.js";
+import { mountWordsPanel } from "./study-words.js?v=20260718";
+import { mountPhrasesPanel } from "./study-phrases.js?v=20260718";
 import { bindScrollTop } from "../ui/scroll-top.js";
 
 let section = "studying";
@@ -331,7 +332,7 @@ function learnedWordsTable(words) {
   return `
     <div class="card list-card">
       <div class="list-table-wrap">
-        <table class="list-table">
+        <table class="list-table list-table-compact">
           <thead><tr><th>Слово</th><th>Переводы</th><th></th></tr></thead>
           <tbody>${words.map((w) => learnedWordRow(w)).join("")}</tbody>
         </table>
@@ -346,7 +347,7 @@ function learnedPhrasesTable(phrases) {
   return `
     <div class="card list-card">
       <div class="list-table-wrap">
-        <table class="list-table">
+        <table class="list-table list-table-compact">
           <thead><tr><th>Выражение</th><th>Переводы</th><th></th></tr></thead>
           <tbody>${phrases.map((p) => learnedPhraseRow(p)).join("")}</tbody>
         </table>
@@ -368,7 +369,7 @@ function stopListTable(entries) {
   return `
     <div class="card list-card">
       <div class="list-table-wrap">
-        <table class="list-table">
+        <table class="list-table list-table-compact">
           <thead><tr><th>Слово</th><th>Переводы</th><th></th></tr></thead>
           <tbody>${entries.map((e) => stopWordRow(e)).join("")}</tbody>
         </table>
@@ -386,8 +387,10 @@ function learnedWordRow(entry) {
       <td><strong>${esc(lemma)}</strong>${inCards ? ` ${inCards}` : ""}</td>
       <td class="col-trans-cell">${esc(trans)}</td>
       <td class="col-actions">
-        <button type="button" class="btn outline btn-sm" data-act="return-word" data-lemma="${escAttr(lemma)}" title="Вернуть в изучение">↩</button>
-        <button type="button" class="btn outline btn-sm btn-icon-danger" data-act="exclude-word" data-lemma="${escAttr(lemma)}" title="В стоп-лист">🚫</button>
+        <div class="row-actions">
+          ${btnReturnStudy(`data-act="return-word" data-lemma="${escAttr(lemma)}"`)}
+          ${btnStopList(`data-act="exclude-word" data-lemma="${escAttr(lemma)}"`)}
+        </div>
       </td>
     </tr>`;
 }
@@ -402,8 +405,10 @@ function learnedPhraseRow(entry) {
         ${phrase ? ` <span class="tag tag-manual">в карточках</span>` : ""}</td>
       <td class="col-trans-cell">${esc(trans)}</td>
       <td class="col-actions">
-        <button type="button" class="btn outline btn-sm" data-act="return-phrase" data-text="${escAttr(text)}" title="Вернуть в изучение">↩</button>
-        <button type="button" class="btn outline btn-sm btn-icon-danger" data-act="exclude-phrase" data-text="${escAttr(text)}" title="Исключить из импорта">🚫</button>
+        <div class="row-actions">
+          ${btnReturnStudy(`data-act="return-phrase" data-text="${escAttr(text)}"`)}
+          ${btnRemove(`data-act="exclude-phrase" data-text="${escAttr(text)}"`, { title: "Исключить из импорта" })}
+        </div>
       </td>
     </tr>`;
 }
@@ -418,8 +423,10 @@ function stopWordRow(entry) {
       <td><strong>${esc(lemma)}</strong>${inCards ? ` ${inCards}` : ""}</td>
       <td class="col-trans-cell">${esc(trans)}</td>
       <td class="col-actions">
-        <button type="button" class="btn outline btn-sm" data-act="return-stop-word" data-lemma="${escAttr(lemma)}" title="Вернуть в изучение">↩</button>
-        <button type="button" class="btn outline btn-sm btn-icon-danger" data-act="remove-stop-word" data-lemma="${escAttr(lemma)}" title="Убрать из стоп-листа">✕</button>
+        <div class="row-actions">
+          ${btnReturnStudy(`data-act="return-stop-word" data-lemma="${escAttr(lemma)}"`)}
+          ${btnDeleteWord(`data-act="purge-stop-word" data-lemma="${escAttr(lemma)}"`)}
+        </div>
       </td>
     </tr>`;
 }
@@ -500,9 +507,9 @@ function bindStopListActions(el, ctx) {
       if (act === "return-stop-word") {
         if (!confirm(`Вернуть «${lemma}» в изучение?`)) return;
         returnStopWordToStudy(ctx.state, lemma);
-      } else if (act === "remove-stop-word") {
-        if (!confirm(`Убрать «${lemma}» из стоп-листа? Слово снова может появиться при импорте.`)) return;
-        removeStopWord(ctx.state, lemma);
+      } else if (act === "purge-stop-word") {
+        if (!confirm(`Удалить «${lemma}» из базы? Слово исчезнет из стоп-листа и карточек.`)) return;
+        purgeWord(ctx.state, lemma);
       }
       ctx.save();
       draw(el, ctx);

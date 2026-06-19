@@ -30,13 +30,15 @@ function stopEntryLemma(entry) {
 
 function normalizeStopEntry(entry) {
   if (typeof entry === "string") {
-    return { lemma: String(entry).trim(), translations: [] };
+    return { lemma: String(entry).trim(), translations: [], sources: [], manual: false };
   }
   return {
     lemma: String(entry?.lemma ?? "").trim(),
     translations: Array.isArray(entry?.translations)
       ? entry.translations.filter(Boolean).slice(0, 3)
       : [],
+    sources: Array.isArray(entry?.sources) ? entry.sources.filter(Boolean) : [],
+    manual: Boolean(entry?.manual),
   };
 }
 
@@ -54,6 +56,10 @@ function normalizeStopList(list) {
     if (entry.translations.length && !prev.translations.length) {
       prev.translations = entry.translations;
     }
+    if (entry.sources.length && !prev.sources.length) {
+      prev.sources = entry.sources;
+    }
+    if (entry.manual) prev.manual = true;
   }
   return [...seen.values()].sort((a, b) => a.lemma.localeCompare(b.lemma));
 }
@@ -673,13 +679,18 @@ export function findPhraseById(state, id) {
   return state.phrases.find((p) => p.id === id) || null;
 }
 
-export function addWordManual(state, { lemma, translations = [] }) {
+export function addWordManual(state, { lemma, translations = [], sources = [], manual = true }) {
   const l = String(lemma ?? "").trim();
   if (!l) return null;
   const existing = findWordByLemma(state, l);
   if (existing) return existing;
 
-  const word = makeWord({ lemma: l, translations: translations.filter(Boolean).slice(0, 3), manual: true });
+  const word = makeWord({
+    lemma: l,
+    translations: translations.filter(Boolean).slice(0, 3),
+    sources,
+    manual,
+  });
   state.words.push(word);
   return word;
 }
@@ -715,7 +726,10 @@ export function deleteWord(state, id) {
   const idx = state.words.findIndex((w) => w.id === id);
   if (idx === -1) return false;
   const word = state.words[idx];
-  addStopWord(state, word.lemma, word.translations || []);
+  addStopWord(state, word.lemma, word.translations || [], {
+    sources: word.sources || [],
+    manual: Boolean(word.manual),
+  });
   state.words.splice(idx, 1);
   return true;
 }
@@ -808,7 +822,7 @@ export function returnStopWordToStudy(state, lemma) {
   if (!l || !isStopWord(state, lemma)) return false;
 
   const stopEntry = (state.settings.stopList || []).find((x) => stopEntryLemma(x) === l);
-  const savedTranslations = stopEntry ? normalizeStopEntry(stopEntry).translations : [];
+  const saved = stopEntry ? normalizeStopEntry(stopEntry) : normalizeStopEntry("");
 
   removeStopWord(state, lemma);
   removeKnownLemma(state, lemma);
@@ -817,11 +831,20 @@ export function returnStopWordToStudy(state, lemma) {
   if (existing) {
     existing.learned = false;
     existing.srs = emptySrs();
-    if (savedTranslations.length && !existing.translations?.length) {
-      existing.translations = savedTranslations;
+    if (saved.translations.length && !existing.translations?.length) {
+      existing.translations = saved.translations;
+    }
+    if (saved.sources.length && !existing.sources?.length) {
+      existing.sources = saved.sources;
+      if (!saved.manual) existing.manual = false;
     }
   } else {
-    addWordManual(state, { lemma: String(lemma).trim(), translations: savedTranslations });
+    addWordManual(state, {
+      lemma: String(lemma).trim(),
+      translations: saved.translations,
+      sources: saved.sources,
+      manual: saved.manual,
+    });
   }
   return true;
 }
@@ -985,6 +1008,10 @@ export function hardResetState(state) {
   return state;
 }
 
+export function isTrainableItem(item) {
+  return Boolean(item) && !item.learned && (item.translations || []).some(Boolean);
+}
+
 export function getAppStats(state) {
   const words = state.words || [];
   const phrases = state.phrases || [];
@@ -993,8 +1020,8 @@ export function getAppStats(state) {
     phrases: phrases.length,
     learnedWords: words.filter((w) => w.learned).length,
     learnedPhrases: phrases.filter((p) => p.learned).length,
-    activeWords: words.filter((w) => !w.learned).length,
-    activePhrases: phrases.filter((p) => !p.learned).length,
+    activeWords: words.filter(isTrainableItem).length,
+    activePhrases: phrases.filter(isTrainableItem).length,
     shows: (state.shows || []).length,
     books: (state.books || []).length,
   };
@@ -1005,24 +1032,28 @@ export function getAppStats(state) {
 // ===================================================================
 
 // --- Добавить лемму в стоп-лист («мусорка») ---
-export function addStopWord(state, lemma, translations = []) {
+export function addStopWord(state, lemma, translations = [], meta = {}) {
   const trimmed = String(lemma).trim();
   const l = trimmed.toLowerCase();
   if (!l) return false;
   if (!Array.isArray(state.settings.stopList)) state.settings.stopList = [];
 
   const trans = Array.isArray(translations) ? translations.filter(Boolean).slice(0, 3) : [];
+  const sources = Array.isArray(meta.sources) ? meta.sources.filter(Boolean) : [];
+  const manual = Boolean(meta.manual);
   const idx = state.settings.stopList.findIndex((x) => stopEntryLemma(x) === l);
 
   if (idx >= 0) {
     const existing = normalizeStopEntry(state.settings.stopList[idx]);
-    if (trans.length && !existing.translations.length) {
-      state.settings.stopList[idx] = { lemma: existing.lemma || trimmed, translations: trans };
-    }
+    const entry = { ...existing, lemma: existing.lemma || trimmed };
+    if (trans.length && !entry.translations.length) entry.translations = trans;
+    if (sources.length && !entry.sources.length) entry.sources = sources;
+    if (manual) entry.manual = true;
+    state.settings.stopList[idx] = entry;
     return false;
   }
 
-  state.settings.stopList.push({ lemma: trimmed, translations: trans });
+  state.settings.stopList.push({ lemma: trimmed, translations: trans, sources, manual });
   return true;
 }
 
@@ -1034,6 +1065,23 @@ export function removeStopWord(state, lemma) {
     (x) => stopEntryLemma(x) !== l
   );
   return state.settings.stopList.length !== before;
+}
+
+/** Удалить слово из всех коллекций (стоп-лист, карточки, база знаний). */
+export function purgeWord(state, lemma) {
+  const l = String(lemma).toLowerCase().trim();
+  if (!l) return false;
+
+  let changed = removeStopWord(state, lemma);
+  changed = removeKnownLemma(state, lemma) || changed;
+
+  const idx = state.words.findIndex((w) => w.lemma.toLowerCase().trim() === l);
+  if (idx >= 0) {
+    state.words.splice(idx, 1);
+    changed = true;
+  }
+
+  return changed;
 }
 
 export function repairStopListTranslations(state, lookup) {

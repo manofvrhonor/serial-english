@@ -1,6 +1,6 @@
 import {
   buildSession, prepareCard, resolveMode, applyAnswer,
-  countDue, directionLabel, modeLabel,
+  countTrainingItems, directionLabel, modeLabel,
 } from "../core/srs.js";
 import {
   recordSessionSummary,
@@ -58,7 +58,12 @@ export function renderTraining(el, ctx) {
 }
 
 function renderSetup(el, ctx) {
-  const due = countDue(ctx.state);
+  const due = countTrainingItems(ctx.state, {
+    content: setup.content,
+    direction: setup.direction,
+    dueOnly: setup.dueOnly,
+  });
+  const dueLabel = setup.dueOnly ? "К повторению сегодня" : "Доступно для тренировки";
   const today = getTodayTrainingSummary(ctx.state);
   const history = ctx.state.settings?.sessionHistory || [];
 
@@ -73,7 +78,7 @@ function renderSetup(el, ctx) {
       </h1>
 
       <div class="card card-padded train-setup-card">
-        ${due ? `<div class="train-due-badge">К повторению сегодня: <strong>${due}</strong></div>` : ""}
+        ${due ? `<div class="train-due-badge">${dueLabel}: <strong>${due}</strong></div>` : ""}
 
         <div class="train-field">
           <div class="train-field-label">Что тренируем</div>
@@ -151,6 +156,7 @@ function renderSetup(el, ctx) {
 
   el.querySelector("#t-dueonly")?.addEventListener("change", (e) => {
     setup.dueOnly = e.target.checked;
+    renderSetup(el, ctx);
   });
 
   el.querySelector("#t-start").addEventListener("click", () => {

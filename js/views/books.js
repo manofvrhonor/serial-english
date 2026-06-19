@@ -64,7 +64,7 @@ function renderChapterCard(ctx, book, ch) {
       <div class="source-ep-head">
         <span class="source-ep-label">${esc(label)}</span>
       </div>
-      <div class="prog-bar prog-bar-thin" title="${readiness.learned} из ${readiness.total}">
+      <div class="prog-bar-thin" title="${readiness.learned} из ${readiness.total} (${readiness.percent}%)">
         <div class="prog-fill" style="width:${readiness.percent}%"></div>
       </div>
       <button type="button" class="btn btn-sm tree-prep-btn source-prep-btn" data-source="${escAttr(ch.id)}" data-label="${escAttr(fullLabel)}"

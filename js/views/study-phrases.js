@@ -5,8 +5,7 @@ import {
 } from "../db/database.js";
 import { transChipsHtml, bindTransChipsContainers } from "../ui/trans-chips.js?v=20260715";
 import { openSourcesModal } from "../ui/sources-modal.js?v=20260715";
-
-const ICON_SOURCES = `<svg class="btn-icon-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M3 5h.01"/><path d="M3 12h.01"/><path d="M3 19h.01"/><path d="M8 5h13"/><path d="M8 12h13"/><path d="M8 19h13"/></svg>`;
+import { btnLearned, btnDeleteWord, btnSources } from "../ui/action-icons.js";
 
 import { bindScrollTop } from "../ui/scroll-top.js";
 
@@ -78,9 +77,9 @@ function rowHtml(p) {
       <td class="col-trans-cell">${transChipsHtml(p.translations || [], { id: p.id })}</td>
       <td class="col-actions">
         <div class="row-actions">
-          <button type="button" class="btn outline btn-sm btn-icon-only" data-act="learn" data-id="${p.id}" title="Выучено">✓</button>
-          <button type="button" class="btn outline btn-sm btn-icon-only btn-icon-danger" data-act="delete" data-id="${p.id}" title="Удалить">✕</button>
-          <button type="button" class="btn outline btn-sm btn-icon-only" data-act="sources" data-id="${p.id}" title="${escAttr(sourcesTitle)}" ${canShowSources ? "" : "disabled"}>${ICON_SOURCES}</button>
+          ${btnLearned(`data-act="learn" data-id="${p.id}"`)}
+          ${btnDeleteWord(`data-act="delete" data-id="${p.id}"`, { title: "Удалить" })}
+          ${btnSources(`data-act="sources" data-id="${p.id}"`, escAttr(sourcesTitle), !canShowSources)}
         </div>
       </td>
     </tr>`;

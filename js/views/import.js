@@ -9,13 +9,20 @@ import { getPhrases, translatePhrase } from "../import/phrases.js";
 import { attachSwipeCard } from "../ui/swipe-card.js";
 import { transChipsHtml, bindTransChipsContainers } from "../ui/trans-chips.js?v=20260714";
 import { refreshPageScrollTop, unbindScrollTop } from "../ui/scroll-top.js";
+import { btnLearned, btnStopList } from "../ui/action-icons.js";
 
 let session = null;
 let swipeDetach = null;
 let pendingImportCommit = null;
 let importConfirmModalReady = false;
 
-const defaultUi = () => ({ tab: "words", view: "cards", stackIndex: 0 });
+const defaultUi = () => ({
+  tab: "words",
+  view: "list",
+  stackIndex: 0,
+  wordsPhase: "withTrans",
+  phrasesPhase: "withTrans",
+});
 
 export function renderImport(el, ctx) {
   session = null;
@@ -29,7 +36,7 @@ export function renderImport(el, ctx) {
         <div class="import-upload">
           <label class="import-filelabel">
             <input type="file" id="import-file" accept=".srt,.txt" hidden />
-            <span class="import-filebtn btn btn-lg">Загрузить файл</span>
+            <span class="import-filebtn btn btn-lg">Загрузить новый файл</span>
           </label>
           <span id="import-filename" class="import-filename">srt или txt</span>
         </div>
@@ -76,22 +83,24 @@ async function handleFile(el, ctx, file) {
     words: [], phrases: [], dict: null, phrasesDb: null,
     ui: defaultUi(),
   };
-  renderMeta(el, ctx, meta, text);
+  renderMeta(el, meta);
+  await runAnalyze(el, ctx);
 }
 
-function renderMeta(el, ctx, meta, text) {
+function renderMeta(el, meta) {
   const box = el.querySelector("#import-meta");
   box.hidden = false;
-  const preview = text.length > 300 ? text.slice(0, 300) + "…" : text;
 
   const fields = meta.kind === "srt" ? `
     <div class="form-grid form-grid-show">
-      <label class="field-label field-full">Сериал<input type="text" id="m-show" value="${esc(meta.show)}" /></label>
       <div class="field-row-compact">
+        <label class="field-label field-grow">Сериал<input type="text" id="m-show" value="${esc(meta.show)}" /></label>
         <label class="field-label field-num">Сезон<input type="number" id="m-season" class="input-num" value="${meta.season ?? ""}" min="0" /></label>
+      </div>
+      <div class="field-row-compact">
+        <label class="field-label field-grow">Название серии<input type="text" id="m-eptitle" value="${esc(meta.episodeTitle)}" /></label>
         <label class="field-label field-num">Серия<input type="number" id="m-episode" class="input-num" value="${meta.episode ?? ""}" min="0" /></label>
       </div>
-      <label class="field-label field-full">Название серии<input type="text" id="m-eptitle" value="${esc(meta.episodeTitle)}" /></label>
     </div>` : `
     <div class="form-grid form-grid-book">
       <label class="field-label field-full">Книга<input type="text" id="m-book" value="${esc(meta.book)}" /></label>
@@ -104,22 +113,13 @@ function renderMeta(el, ctx, meta, text) {
   box.innerHTML = `
     <p class="import-section-title">${meta.kind === "srt" ? "Распознано как сериал" : "Распознано как книга"}</p>
     ${fields}
-    <div class="import-preview">
-      <div class="import-preview-label">Текст (${text.length} символов)</div>
-      <div class="import-preview-text">${esc(preview)}</div>
-    </div>
-    <button id="btn-analyze" class="btn mt-16">Разобрать →</button>
   `;
-
-  box.querySelector("#btn-analyze").addEventListener("click", () => runAnalyze(el, ctx));
 }
 
 async function runAnalyze(el, ctx) {
-  const btn = el.querySelector("#btn-analyze");
-  if (btn) {
-    btn.disabled = true;
-    btn.textContent = "Загрузка словаря…";
-  }
+  const resultBox = el.querySelector("#import-result");
+  resultBox.hidden = false;
+  resultBox.innerHTML = `<div class="card card-padded"><p class="muted">Загрузка словаря…</p></div>`;
 
   try {
     const dict = await getDictionary();
@@ -141,14 +141,11 @@ async function runAnalyze(el, ctx) {
     }));
 
     session.ui = defaultUi();
+    session.totals = { wordAdded: 0, wordUpdated: 0, phraseAdded: 0, phraseUpdated: 0, label: "" };
+    initPhases();
     renderResult(el, ctx);
   } catch (err) {
-    showError(el, "Ошибка при разборе: " + err.message);
-  } finally {
-    if (btn) {
-      btn.disabled = false;
-      btn.textContent = "Разобрать →";
-    }
+    resultBox.innerHTML = `<div class="card card-padded"><div class="import-error">Ошибка при разборе: ${esc(err.message)}</div></div>`;
   }
 }
 
@@ -160,32 +157,147 @@ function livePhrases() {
   return session.phrases.filter((p) => !p.removed && p.included);
 }
 
+function isNewWord(w) {
+  return !w.known && !w.stop && !w.studying;
+}
+
+function isNewPhrase(p) {
+  return !p.known && !p.studying;
+}
+
+function hasTranslation(item) {
+  return resolveTranslations(item).length > 0;
+}
+
+function newWordsWithTrans() {
+  return session.words.filter((w) => !w.removed && isNewWord(w) && hasTranslation(w));
+}
+
+function newWordsNoTrans() {
+  return session.words.filter((w) => !w.removed && isNewWord(w) && !hasTranslation(w));
+}
+
+function newPhrasesWithTrans() {
+  return session.phrases.filter((p) => !p.removed && isNewPhrase(p) && hasTranslation(p));
+}
+
+function newPhrasesNoTrans() {
+  return session.phrases.filter((p) => !p.removed && isNewPhrase(p) && !hasTranslation(p));
+}
+
+function displayWords() {
+  return session.ui.wordsPhase === "withTrans" ? newWordsWithTrans() : newWordsNoTrans();
+}
+
+function displayPhrases() {
+  return session.ui.phrasesPhase === "withTrans" ? newPhrasesWithTrans() : newPhrasesNoTrans();
+}
+
+function initPhases() {
+  session.ui.wordsPhase = newWordsWithTrans().length > 0 ? "withTrans" : "noTrans";
+  session.ui.phrasesPhase = newPhrasesWithTrans().length > 0 ? "withTrans" : "noTrans";
+  syncSelectionToPhases();
+}
+
+function syncSelectionToPhases() {
+  const visibleWords = new Set(displayWords());
+  const visiblePhrases = new Set(displayPhrases());
+  for (const w of session.words) {
+    if (w.removed) continue;
+    w.included = visibleWords.has(w);
+  }
+  for (const p of session.phrases) {
+    if (p.removed) continue;
+    p.included = visiblePhrases.has(p);
+  }
+}
+
+function maybeAdvanceWordsPhase(el, ctx) {
+  if (session.ui.wordsPhase !== "withTrans") return false;
+  if (newWordsWithTrans().length > 0) return false;
+  if (newWordsNoTrans().length === 0) return false;
+  session.ui.wordsPhase = "noTrans";
+  session.ui.stackIndex = 0;
+  syncSelectionToPhases();
+  renderResult(el, ctx);
+  return true;
+}
+
+function maybeAdvancePhrasesPhase(el, ctx) {
+  if (session.ui.phrasesPhase !== "withTrans") return false;
+  if (newPhrasesWithTrans().length > 0) return false;
+  if (newPhrasesNoTrans().length === 0) return false;
+  session.ui.phrasesPhase = "noTrans";
+  session.ui.stackIndex = 0;
+  syncSelectionToPhases();
+  renderResult(el, ctx);
+  return true;
+}
+
+function importSessionComplete() {
+  return newWordsWithTrans().length === 0
+    && newWordsNoTrans().length === 0
+    && newPhrasesWithTrans().length === 0
+    && newPhrasesNoTrans().length === 0;
+}
+
+function bulkBarHtml(kind) {
+  const visible = kind === "word" ? displayWords() : displayPhrases();
+  const selected = visible.filter((item) => item.included).length;
+  const allIncluded = visible.length > 0 && visible.every((item) => item.included);
+  const selectAllId = kind === "word" ? "import-select-all-words" : "import-select-all-phrases";
+
+  return `
+    <div class="bulk-bar">
+      <label><input type="checkbox" id="${selectAllId}" ${allIncluded ? "checked" : ""} /> Выбрать всё</label>
+      <span class="import-row-meta" id="import-selected-count">Выбрано: ${selected}</span>
+    </div>`;
+}
+
+function updateSelectedCount(el, kind) {
+  const visible = kind === "word" ? displayWords() : displayPhrases();
+  const selected = visible.filter((item) => item.included).length;
+  const span = el.querySelector("#import-selected-count");
+  if (span) span.textContent = `Выбрано: ${selected}`;
+}
+
 function renderResult(el, ctx) {
+  if (session.ui.wordsPhase === "withTrans" && !newWordsWithTrans().length && newWordsNoTrans().length) {
+    session.ui.wordsPhase = "noTrans";
+    session.ui.stackIndex = 0;
+    syncSelectionToPhases();
+  }
+  if (session.ui.phrasesPhase === "withTrans" && !newPhrasesWithTrans().length && newPhrasesNoTrans().length) {
+    session.ui.phrasesPhase = "noTrans";
+    session.ui.stackIndex = 0;
+    syncSelectionToPhases();
+  }
+
   const box = el.querySelector("#import-result");
   box.hidden = false;
-  const wc = liveWords().length;
-  const pc = livePhrases().length;
-  const hasNew = wc > 0 || pc > 0;
+  const wc = displayWords().length;
+  const pc = displayPhrases().length;
+  const hasVisible = wc > 0 || pc > 0;
   const { tab, view } = session.ui;
 
   box.innerHTML = `
     <div class="card card-padded import-section-gap">
+      ${hasVisible ? `
+      <div class="import-commit-row">
+        <button type="button" id="btn-commit" class="btn">Добавить выбранные в словарь</button>
+      </div>` : ""}
       <div class="import-toolbar">
-        <div class="tabs" role="tablist">
+        <div class="tabs import-kind-tabs" role="tablist">
           <button type="button" class="tab-btn ${tab === "words" ? "active" : ""}" data-tab="words">Слова (${wc})</button>
           <button type="button" class="tab-btn ${tab === "phrases" ? "active" : ""}" data-tab="phrases">Фразы (${pc})</button>
         </div>
-        ${tab === "words" && wc > 0 ? `
-        <div class="tabs">
-          <button type="button" class="tab-btn ${view === "cards" ? "active" : ""}" data-view="cards">Карточки</button>
+        ${(tab === "words" ? wc : pc) > 0 ? `
+        <div class="tabs import-view-tabs">
           <button type="button" class="tab-btn ${view === "list" ? "active" : ""}" data-view="list">Список</button>
+          <button type="button" class="tab-btn ${view === "cards" ? "active" : ""}" data-view="cards">Карточки</button>
         </div>` : ""}
       </div>
       <div id="import-panel"></div>
-      ${hasNew ? `
-      <div class="row mt-16" id="import-commit-row">
-        <button type="button" id="btn-commit" class="btn">Импортировать выбранные</button>
-      </div>` : ""}
       <div id="import-done" class="import-done" hidden></div>
     </div>
   `;
@@ -236,8 +348,10 @@ function ensureImportConfirmModal() {
 }
 
 function getChosenItems() {
-  const chosenWords = session.words.filter((w) => w.included && !w.removed);
-  const chosenPhrases = session.phrases.filter((p) => p.included && !p.removed);
+  const visibleWords = new Set(displayWords());
+  const visiblePhrases = new Set(displayPhrases());
+  const chosenWords = session.words.filter((w) => w.included && !w.removed && visibleWords.has(w));
+  const chosenPhrases = session.phrases.filter((p) => p.included && !p.removed && visiblePhrases.has(p));
   return { chosenWords, chosenPhrases };
 }
 
@@ -291,20 +405,41 @@ function renderPanel(el, ctx) {
   const panel = el.querySelector("#import-panel");
   if (!panel) return;
 
-  if (session.ui.tab === "phrases") {
-    panel.innerHTML = renderPhrasesPanel(el);
-    bindPhraseEvents(el, ctx);
-    bindImportTransChips(el);
+  const isPhrases = session.ui.tab === "phrases";
+  const stats = isPhrases ? phraseStatsHtml() : wordStatsHtml();
+
+  if (isPhrases) {
+    const ps = phraseSummary(session.phrases);
+    if (ps.total === 0) {
+      panel.innerHTML = `${stats}<p class="list-empty">Выражения не найдены</p>`;
+      return;
+    }
+    if (!displayPhrases().length) {
+      const pending = session.ui.phrasesPhase === "withTrans" && newPhrasesNoTrans().length > 0
+        ? `<p class="list-empty">Выражения с переводом обработаны. Перейдите к фразам без перевода во вкладке «Фразы».</p>`
+        : `<p class="list-empty">Нет новых выражений для импорта — все уже знаете или на изучении.</p>`;
+      panel.innerHTML = `${stats}${pending}`;
+      return;
+    }
+  } else if (!displayWords().length) {
+    const pending = session.ui.wordsPhase === "withTrans" && newWordsNoTrans().length > 0
+      ? `<p class="list-empty">Слова с переводом обработаны. Добавьте оставшиеся или перейдите к словам без перевода.</p>`
+      : `<p class="list-empty">Нет новых слов для импорта — все уже знаете, в стоп-листе или на изучении.</p>`;
+    panel.innerHTML = `${wordStatsHtml()}${pending}`;
     return;
   }
 
-  panel.innerHTML = `
-    ${wordStatsHtml()}
-    ${session.ui.view === "cards" ? renderWordCards(el, ctx) : renderWordList(el)}
-  `;
+  panel.innerHTML = `${stats}${
+    session.ui.view === "cards"
+      ? (isPhrases ? renderPhraseCards(el, ctx) : renderWordCards(el, ctx))
+      : (isPhrases ? renderPhraseList(el) : renderWordList(el))
+  }`;
 
   if (session.ui.view === "cards") {
-    bindWordCards(el, ctx);
+    if (isPhrases) bindPhraseCards(el, ctx);
+    else bindWordCards(el, ctx);
+  } else if (isPhrases) {
+    bindPhraseListEvents(el, ctx);
   } else {
     bindWordListEvents(el, ctx);
   }
@@ -312,9 +447,21 @@ function renderPanel(el, ctx) {
 }
 
 function wordStatsHtml() {
+  const withTrans = newWordsWithTrans().length;
+  const noTrans = newWordsNoTrans().length;
+  const phase = session.ui.wordsPhase;
+
+  if (phase === "noTrans") {
+    return `
+      <div class="import-stats import-stats-summary">
+        <p class="import-stats-lead import-stats-phase">
+          Нашлось <strong>${noTrans}</strong> ${pluralWords(noTrans)} без перевода.
+          Впишите вручную или отправьте в стоп-лист, если это не слова.
+        </p>
+      </div>`;
+  }
+
   const ws = analyzeSummary(session.words);
-  const visible = liveWords();
-  const noTrans = visible.filter((w) => !resolveTranslations(w).length).length;
   return `
     <div class="import-stats import-stats-summary">
       <p class="import-stats-lead">
@@ -324,14 +471,29 @@ function wordStatsHtml() {
         на изучении <strong>${ws.studyingCount}</strong>,
         новых <strong>${ws.newCount}</strong>.
       </p>
-      ${noTrans ? `<p class="import-stats-note"><span class="stat-chip stat-chip-warning">Без перевода: ${noTrans}</span></p>` : ""}
+      <p class="import-stats-lead import-stats-phase">
+        Слова с переводом — <strong>${withTrans}</strong><br />
+        Без перевода — <strong>${noTrans}</strong>
+      </p>
     </div>`;
 }
 
 function phraseStatsHtml() {
+  const withTrans = newPhrasesWithTrans().length;
+  const noTrans = newPhrasesNoTrans().length;
+  const phase = session.ui.phrasesPhase;
+
+  if (phase === "noTrans") {
+    return `
+      <div class="import-stats import-stats-summary">
+        <p class="import-stats-lead import-stats-phase">
+          Нашлось <strong>${noTrans}</strong> ${pluralPhrases(noTrans)} без перевода.
+          Впишите вручную или отметьте «Знаю», если уже знаете.
+        </p>
+      </div>`;
+  }
+
   const ps = phraseSummary(session.phrases);
-  const visible = livePhrases();
-  const noTrans = visible.filter((p) => !resolveTranslations(p).length).length;
   return `
     <div class="import-stats import-stats-summary">
       <p class="import-stats-lead">
@@ -340,18 +502,38 @@ function phraseStatsHtml() {
         на изучении <strong>${ps.studyingCount}</strong>,
         новых <strong>${ps.newCount}</strong>.
       </p>
-      ${noTrans ? `<p class="import-stats-note"><span class="stat-chip stat-chip-warning">Без перевода: ${noTrans}</span></p>` : ""}
+      <p class="import-stats-lead import-stats-phase">
+        Выражения с переводом — <strong>${withTrans}</strong><br />
+        Без перевода — <strong>${noTrans}</strong>
+      </p>
     </div>`;
 }
 
+function pluralWords(n) {
+  const mod10 = n % 10;
+  const mod100 = n % 100;
+  if (mod10 === 1 && mod100 !== 11) return "слово";
+  if (mod10 >= 2 && mod10 <= 4 && (mod100 < 10 || mod100 >= 20)) return "слова";
+  return "слов";
+}
+
+function pluralPhrases(n) {
+  const mod10 = n % 10;
+  const mod100 = n % 100;
+  if (mod10 === 1 && mod100 !== 11) return "выражение";
+  if (mod10 >= 2 && mod10 <= 4 && (mod100 < 10 || mod100 >= 20)) return "выражения";
+  return "выражений";
+}
+
 function renderWordCards(el, ctx) {
-  const live = liveWords();
-  if (!live.length) {
-    return `<p class="list-empty">Нет новых слов для импорта — все уже знаете, в стоп-листе или на изучении.</p>`;
+  const visible = displayWords();
+  if (!visible.length) {
+    const pending = session.ui.wordsPhase === "withTrans" && newWordsNoTrans().length > 0;
+    return `<p class="list-empty">${pending ? "Слова с переводом обработаны." : "Нет слов для импорта на этом шаге."}</p>`;
   }
 
-  if (session.ui.stackIndex >= live.length) session.ui.stackIndex = 0;
-  const w = live[session.ui.stackIndex];
+  if (session.ui.stackIndex >= visible.length) session.ui.stackIndex = 0;
+  const w = visible[session.ui.stackIndex];
   const i = session.words.indexOf(w);
   const trans = resolveTranslations(w);
   const transHtml = trans.length
@@ -384,12 +566,12 @@ function renderWordCards(el, ctx) {
 }
 
 function bindWordCards(el, ctx) {
-  const live = liveWords();
-  if (!live.length) return;
+  const visible = displayWords();
+  if (!visible.length) return;
 
   const swipeEl = el.querySelector("#import-swipe");
   if (swipeEl) {
-    const w = live[session.ui.stackIndex];
+    const w = visible[session.ui.stackIndex];
     const i = session.words.indexOf(w);
     swipeDetach = attachSwipeCard(swipeEl, {
       onLeft: () => wordAction(el, ctx, i, "stop"),
@@ -421,18 +603,16 @@ function wordAction(el, ctx, i, act) {
 }
 
 function renderWordList(el) {
-  const live = liveWords();
-  if (!live.length) return `<p class="list-empty">Нет новых слов для импорта.</p>`;
-
-  const allIncluded = live.length > 0 && live.every((w) => w.included);
+  const visible = displayWords();
+  if (!visible.length) {
+    const pending = session.ui.wordsPhase === "withTrans" && newWordsNoTrans().length > 0;
+    return `<p class="list-empty">${pending ? "Слова с переводом обработаны." : "Нет слов для импорта на этом шаге."}</p>`;
+  }
 
   return `
-    <div class="bulk-bar">
-      <label><input type="checkbox" id="import-all-words" ${allIncluded ? "checked" : ""} /> Все</label>
-      <span class="import-row-meta">Выбрано: ${live.filter((w) => w.included).length}</span>
-    </div>
+    ${bulkBarHtml("word")}
     <div class="import-rows" id="import-word-rows">
-      ${live.map((w) => wordRowCard(w, session.words.indexOf(w))).join("")}
+      ${visible.map((w) => wordRowCard(w, session.words.indexOf(w))).join("")}
     </div>`;
 }
 
@@ -450,16 +630,16 @@ function wordRowCard(w, i) {
       </div>
       <div class="import-row-trans">${translationCell(w, i, "word")}</div>
       <div class="import-row-actions">
-        <button type="button" class="btn outline btn-sm row-btn-known" data-act="known" data-kind="word" data-i="${i}">Знаю</button>
-        <button type="button" class="btn outline btn-sm row-btn-stop" data-act="stop" data-kind="word" data-i="${i}">Стоп</button>
+        ${btnLearned(`data-act="known" data-kind="word" data-i="${i}"`, { title: "Знаю", extraClass: "row-btn-known" })}
+        ${btnStopList(`data-act="stop" data-kind="word" data-i="${i}"`)}
       </div>
     </div>`;
 }
 
 function bindWordListEvents(el, ctx) {
-  el.querySelector("#import-all-words")?.addEventListener("change", (e) => {
+  el.querySelector("#import-select-all-words")?.addEventListener("change", (e) => {
     const val = e.target.checked;
-    liveWords().forEach((w) => { w.included = val; });
+    displayWords().forEach((w) => { w.included = val; });
     renderPanel(el, ctx);
   });
 
@@ -468,6 +648,7 @@ function bindWordListEvents(el, ctx) {
       const i = +cb.dataset.i;
       session.words[i].included = cb.checked;
       cb.closest(".import-row")?.classList.toggle("row-excluded", !cb.checked);
+      updateSelectedCount(el, "word");
     });
   });
 
@@ -487,47 +668,105 @@ function bindWordListEvents(el, ctx) {
   });
 }
 
-function renderPhrasesPanel(el) {
-  const ps = phraseSummary(session.phrases);
-  const live = livePhrases();
-
-  if (ps.total === 0) {
-    return `${phraseStatsHtml()}<p class="list-empty">Выражения не найдены</p>`;
-  }
-  if (!live.length) {
-    return `${phraseStatsHtml()}<p class="list-empty">Нет новых выражений для импорта — все уже знаете или на изучении.</p>`;
+function renderPhraseCards(el, ctx) {
+  const visible = displayPhrases();
+  if (!visible.length) {
+    const pending = session.ui.phrasesPhase === "withTrans" && newPhrasesNoTrans().length > 0;
+    return `<p class="list-empty">${pending ? "Выражения с переводом обработаны." : "Нет выражений для импорта на этом шаге."}</p>`;
   }
 
-  return `
-    ${phraseStatsHtml()}
-    <div class="import-rows" id="import-phrase-rows">
-      ${live.map((p) => phraseRowCard(p, session.phrases.indexOf(p))).join("")}
-    </div>`;
-}
+  if (session.ui.stackIndex >= visible.length) session.ui.stackIndex = 0;
+  const p = visible[session.ui.stackIndex];
+  const i = session.phrases.indexOf(p);
+  const trans = resolveTranslations(p);
+  const transHtml = trans.length
+    ? esc(trans[0]) + (trans.length > 1 ? `<span class="import-row-meta"> +${trans.length - 1}</span>` : "")
+    : `<span class="muted">нет перевода</span>`;
 
-function phraseRowCard(p, i) {
   return `
-    <div class="import-row ${p.included ? "" : "row-excluded"}" data-kind="phrase" data-i="${i}">
-      <div class="import-row-main">
-        <input type="checkbox" data-kind="phrase" data-i="${i}" ${p.included ? "checked" : ""} />
-        <div>
-          <div class="import-row-title">${esc(p.text)}</div>
-          <div class="import-row-meta">×${p.count} <span class="tag tag-new">новое</span></div>
+    <div class="swipe-stack-wrap">
+      <p class="swipe-hint-text">→ Знаю · ↑ К импорту</p>
+      <div class="swipe-stage">
+        <div class="swipe-card card" id="import-swipe">
+          <div class="swipe-hint swipe-hint-right" hidden>ЗНАЮ</div>
+          <div class="swipe-hint swipe-hint-up" hidden>ИМПОРТ ↑</div>
+          <div class="swipe-card-inner">
+            <div class="swipe-card-word">${esc(p.text)}</div>
+            <div class="import-row-meta">встречается ${p.count}×</div>
+            <div class="swipe-card-trans ${trans.length ? "" : "muted"}">${transHtml}</div>
+          </div>
         </div>
       </div>
-      <div class="import-row-trans">${translationCell(p, i, "phrase")}</div>
-      <div class="import-row-actions">
-        <button type="button" class="btn outline btn-sm row-btn-known" data-act="known" data-kind="phrase" data-i="${i}">Знаю</button>
+      <div class="swipe-actions">
+        <button type="button" class="btn btn-sm" data-swipe="import" data-i="${i}">Импорт</button>
+        <button type="button" class="btn outline btn-sm" data-swipe="known" data-i="${i}">Знаю</button>
       </div>
     </div>`;
 }
 
-function bindPhraseEvents(el, ctx) {
+function bindPhraseCards(el, ctx) {
+  const visible = displayPhrases();
+  if (!visible.length) return;
+
+  const swipeEl = el.querySelector("#import-swipe");
+  if (swipeEl) {
+    const p = visible[session.ui.stackIndex];
+    const i = session.phrases.indexOf(p);
+    swipeDetach = attachSwipeCard(swipeEl, {
+      onRight: () => phraseAction(el, ctx, i, "known"),
+      onSwipeUp: () => phraseAction(el, ctx, i, "import"),
+    });
+  }
+
+  el.querySelectorAll("[data-swipe]").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      phraseAction(el, ctx, +btn.dataset.i, btn.dataset.swipe);
+    });
+  });
+}
+
+function phraseAction(el, ctx, i, act) {
+  const p = session.phrases[i];
+  if (!p || p.removed) return;
+
+  if (act === "import") {
+    p.included = true;
+    session.ui.stackIndex++;
+    renderPanel(el, ctx);
+    return;
+  }
+
+  const fakeBtn = { dataset: { i: String(i), act: "known" } };
+  handleRowAction(el, ctx, fakeBtn, "phrase");
+}
+
+function renderPhraseList(el) {
+  const visible = displayPhrases();
+  if (!visible.length) {
+    const pending = session.ui.phrasesPhase === "withTrans" && newPhrasesNoTrans().length > 0;
+    return `<p class="list-empty">${pending ? "Выражения с переводом обработаны." : "Нет выражений для импорта на этом шаге."}</p>`;
+  }
+
+  return `
+    ${bulkBarHtml("phrase")}
+    <div class="import-rows" id="import-phrase-rows">
+      ${visible.map((p) => phraseRowCard(p, session.phrases.indexOf(p))).join("")}
+    </div>`;
+}
+
+function bindPhraseListEvents(el, ctx) {
+  el.querySelector("#import-select-all-phrases")?.addEventListener("change", (e) => {
+    const val = e.target.checked;
+    displayPhrases().forEach((p) => { p.included = val; });
+    renderPanel(el, ctx);
+  });
+
   el.querySelector("#import-phrase-rows")?.querySelectorAll('input[type="checkbox"]').forEach((cb) => {
     cb.addEventListener("change", () => {
       const i = +cb.dataset.i;
       session.phrases[i].included = cb.checked;
       cb.closest(".import-row")?.classList.toggle("row-excluded", !cb.checked);
+      updateSelectedCount(el, "phrase");
     });
   });
 
@@ -545,6 +784,22 @@ function bindPhraseEvents(el, ctx) {
     if (btn.dataset.kind !== "phrase") return;
     btn.addEventListener("click", () => handleRowAction(el, ctx, btn, "phrase"));
   });
+}
+
+function phraseRowCard(p, i) {
+  return `
+    <div class="import-row ${p.included ? "" : "row-excluded"}" data-kind="phrase" data-i="${i}">
+      <div class="import-row-main">
+        <input type="checkbox" data-kind="phrase" data-i="${i}" ${p.included ? "checked" : ""} />
+        <div>
+          <div class="import-row-title">${esc(p.text)} <span class="import-row-meta">×${p.count}</span> <span class="tag tag-new">новое</span></div>
+        </div>
+      </div>
+      <div class="import-row-trans">${translationCell(p, i, "phrase")}</div>
+      <div class="import-row-actions">
+        ${btnLearned(`data-act="known" data-kind="phrase" data-i="${i}"`, { title: "Знаю", extraClass: "row-btn-known" })}
+      </div>
+    </div>`;
 }
 
 function bindImportTransChips(el) {
@@ -604,6 +859,18 @@ function handleRowAction(el, ctx, btn, kind) {
 
   item.removed = true;
   item.included = false;
+
+  if (kind === "word" && maybeAdvanceWordsPhase(el, ctx)) return;
+  if (kind === "phrase" && maybeAdvancePhrasesPhase(el, ctx)) return;
+  if (importSessionComplete()) {
+    renderCommitted(el, ctx, {
+      wordRes: { added: session.totals.wordAdded, updated: session.totals.wordUpdated },
+      phraseRes: { added: session.totals.phraseAdded, updated: session.totals.phraseUpdated },
+      label: session.totals.label,
+      noTrans: 0,
+    });
+    return;
+  }
   renderResult(el, ctx);
 }
 
@@ -651,12 +918,29 @@ function commit(el, ctx) {
   const phraseRes = phraseItems.length ? addPhrases(ctx.state, phraseItems, sourceId) : { added: 0, updated: 0 };
   ctx.save();
 
-  const noTrans = [...chosenWords, ...chosenPhrases].filter((x) => !resolveTranslations(x).length).length;
+  session.totals.wordAdded += wordRes.added;
+  session.totals.wordUpdated += wordRes.updated;
+  session.totals.phraseAdded += phraseRes.added;
+  session.totals.phraseUpdated += phraseRes.updated;
+  session.totals.label = label;
 
-  session.words = [];
-  session.phrases = [];
-  session.committed = true;
-  renderCommitted(el, ctx, { wordRes, phraseRes, label, noTrans });
+  chosenWords.forEach((w) => { w.removed = true; w.included = false; });
+  chosenPhrases.forEach((p) => { p.removed = true; p.included = false; });
+
+  if (maybeAdvanceWordsPhase(el, ctx)) return;
+  if (maybeAdvancePhrasesPhase(el, ctx)) return;
+
+  if (importSessionComplete()) {
+    renderCommitted(el, ctx, {
+      wordRes: { added: session.totals.wordAdded, updated: session.totals.wordUpdated },
+      phraseRes: { added: session.totals.phraseAdded, updated: session.totals.phraseUpdated },
+      label: session.totals.label,
+      noTrans: 0,
+    });
+    return;
+  }
+
+  renderResult(el, ctx);
 }
 
 function resetImportFileForm(el) {
@@ -690,14 +974,7 @@ function renderCommitted(el, ctx, { wordRes, phraseRes, label, noTrans }) {
         Источник: <b>${esc(label || "—")}</b>
         ${noTrans ? `<br><span class="c-missing">${noTrans} без перевода — дополните в «База знаний → На изучении».</span>` : ""}
       </div>
-      <button type="button" class="btn btn-sm secondary mt-16" id="btn-new-import">Загрузить другой файл</button>
     </div>`;
-
-  box.querySelector("#btn-new-import")?.addEventListener("click", () => {
-    resetImportFileForm(el);
-    box.hidden = true;
-    box.innerHTML = "";
-  });
 }
 
 function showError(el, msg) {
