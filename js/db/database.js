@@ -312,6 +312,19 @@ function normalizePhrase(p) {
   };
 }
 
+function normalizeVocabulary(vocab) {
+  if (!vocab || typeof vocab !== "object") {
+    return { words: [], phrases: [] };
+  }
+  const words = Array.isArray(vocab.words)
+    ? [...new Set(vocab.words.map((w) => String(w).toLowerCase().trim()).filter(Boolean))]
+    : [];
+  const phrases = Array.isArray(vocab.phrases)
+    ? [...new Set(vocab.phrases.map((p) => String(p).toLowerCase().trim()).filter(Boolean))]
+    : [];
+  return { words, phrases };
+}
+
 function normalizeShow(s) {
   return {
     id: s?.id || makeId("show"),
@@ -325,6 +338,7 @@ function normalizeShow(s) {
                 id: ep?.id || makeId("ep"),
                 number: Number.isInteger(ep?.number) ? ep.number : 0,
                 title: String(ep?.title ?? ""),
+                vocabulary: normalizeVocabulary(ep?.vocabulary),
               }))
             : [],
         }))
@@ -341,6 +355,7 @@ function normalizeBook(b) {
           id: ch?.id || makeId("ch"),
           number: Number.isInteger(ch?.number) ? ch.number : 0,
           title: String(ch?.title ?? ""),
+          vocabulary: normalizeVocabulary(ch?.vocabulary),
         }))
       : [],
   };
@@ -572,6 +587,33 @@ export function addPhrases(state, items, source) {
 }
 
 // Привязка импорта к дереву shows/books → id эпизода/главы
+/** Снимок лексики файла на эпизод/главу (перезаписывается при повторном разборе). */
+export function setSourceVocabulary(state, sourceId, { words = [], phrases = [] } = {}) {
+  if (!sourceId) return false;
+
+  for (const show of state.shows || []) {
+    for (const season of show.seasons || []) {
+      for (const ep of season.episodes || []) {
+        if (ep.id === sourceId) {
+          ep.vocabulary = normalizeVocabulary({ words, phrases });
+          return true;
+        }
+      }
+    }
+  }
+
+  for (const book of state.books || []) {
+    for (const ch of book.chapters || []) {
+      if (ch.id === sourceId) {
+        ch.vocabulary = normalizeVocabulary({ words, phrases });
+        return true;
+      }
+    }
+  }
+
+  return false;
+}
+
 export function resolveImportSource(state, meta, fields) {
   if (meta.kind === "srt") {
     const showTitle = String(fields.show ?? "").trim();

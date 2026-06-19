@@ -1,6 +1,39 @@
-import { calcReadiness, calcReadinessForSources, chapterLabel } from "../core/readiness.js";
+import {
+  calcReadiness,
+  calcReadinessForSources,
+  chapterLabel,
+  snapshotProgressBarHtml,
+  readinessBadge,
+  ensureSnapshotItems,
+  sourceNeedsMaterialize,
+} from "../core/readiness.js";
+import { renderSourceVocab } from "./source-vocab.js";
+import { getDictionary } from "../import/dictionary.js";
+import { getPhrases } from "../import/phrases.js";
 
-export function renderBooks(el, ctx) {
+async function materializeSnapshots(ctx, sourceIds) {
+  const pending = sourceIds.filter((id) => sourceNeedsMaterialize(ctx.state, id));
+  if (!pending.length) return;
+
+  const dict = await getDictionary();
+  const phrasesDb = await getPhrases();
+  let changed = false;
+  for (const id of pending) {
+    if (ensureSnapshotItems(ctx.state, id, dict, phrasesDb)) changed = true;
+  }
+  if (changed) ctx.save();
+}
+
+export async function renderBooks(el, ctx) {
+  if (ctx.sourceVocab?.backRoute === "books") {
+    await materializeSnapshots(ctx, [ctx.sourceVocab.sourceId]);
+    renderSourceVocab(el, ctx, ctx.sourceVocab);
+    return;
+  }
+
+  const chIds = (ctx.state.books || []).flatMap((b) => (b.chapters || []).map((c) => c.id));
+  await materializeSnapshots(ctx, chIds);
+
   const books = ctx.state.books || [];
 
   if (!books.length) {
@@ -30,6 +63,12 @@ export function renderBooks(el, ctx) {
       ctx.startPrepTraining?.(btn.dataset.source, btn.dataset.label);
     });
   });
+
+  el.querySelectorAll(".source-vocab-btn").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      ctx.openSourceVocab?.(btn.dataset.source, btn.dataset.label, "books");
+    });
+  });
 }
 
 function renderBookCard(ctx, book) {
@@ -47,7 +86,7 @@ function renderBookCard(ctx, book) {
       <div class="source-card-header">
         <span class="source-card-icon" aria-hidden="true">📚</span>
         <h2 class="source-card-title">${esc(book.title)}</h2>
-        <span class="source-badge">${readiness.learned}/${readiness.total} изучено</span>
+        <span class="source-badge">${readinessBadge(readiness)}</span>
       </div>
       <div class="source-ep-grid">${chapters || `<p class="source-empty">Нет глав</p>`}</div>
     </article>`;
@@ -58,19 +97,25 @@ function renderChapterCard(ctx, book, ch) {
   const label = chapterLabel(ch);
   const fullLabel = `${book.title} · ${label}`;
   const canPrep = readiness.unlearned > 0;
+  const hasVocab = readiness.total > 0;
 
   return `
     <div class="source-ep-card">
       <div class="source-ep-head">
         <span class="source-ep-label">${esc(label)}</span>
+        <span class="source-ep-badge">${readinessBadge(readiness)}</span>
       </div>
-      <div class="prog-bar-thin" title="${readiness.learned} из ${readiness.total} (${readiness.percent}%)">
-        <div class="prog-fill" style="width:${readiness.percent}%"></div>
+      ${snapshotProgressBarHtml(readiness)}
+      <div class="source-ep-actions">
+        <button type="button" class="btn btn-sm outline source-vocab-btn" data-source="${escAttr(ch.id)}" data-label="${escAttr(fullLabel)}"
+          ${hasVocab ? "" : "disabled title=\"Нет снимка лексики\""}>
+          Словарь главы
+        </button>
+        <button type="button" class="btn btn-sm tree-prep-btn source-prep-btn" data-source="${escAttr(ch.id)}" data-label="${escAttr(fullLabel)}"
+          ${canPrep ? "" : "disabled title=\"Всё готово\""}>
+          Подготовка к чтению
+        </button>
       </div>
-      <button type="button" class="btn btn-sm tree-prep-btn source-prep-btn" data-source="${escAttr(ch.id)}" data-label="${escAttr(fullLabel)}"
-        ${canPrep ? "" : "disabled title=\"Всё выучено\""}>
-        Подготовка к чтению
-      </button>
     </div>`;
 }
 

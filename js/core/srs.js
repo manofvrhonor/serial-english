@@ -1,4 +1,5 @@
 import { todayStr, markWordLearned, markPhraseLearned, isTrainableItem } from "../db/database.js";
+import { isSnapshotPrepItem } from "./readiness.js";
 
 const WEIGHTS = [6, 3, 1];
 
@@ -171,15 +172,15 @@ export function buildSession(state, opts) {
   const today = todayStr();
   const entries = [];
 
-  const matchesSource = (item) => {
+  const matchesSource = (item, kind) => {
     if (!sourceId) return true;
-    return (item.sources || []).includes(sourceId);
+    return isSnapshotPrepItem(state, sourceId, item, kind);
   };
 
   const addItems = (items, kind) => {
     for (const item of items) {
       if (!isTrainableItem(item)) continue;
-      if (!matchesSource(item)) continue;
+      if (!matchesSource(item, kind)) continue;
 
       const dirs = direction === "both" ? ["enru", "ruen"] : [direction];
       for (const dir of dirs) {
@@ -246,14 +247,14 @@ export function countTrainingItems(state, opts = {}) {
   const { content = "all", direction = "both", dueOnly = true, sourceId = null } = opts;
   const today = todayStr();
 
-  const matchesSource = (item) => {
+  const matchesSource = (item, kind) => {
     if (!sourceId) return true;
-    return (item.sources || []).includes(sourceId);
+    return isSnapshotPrepItem(state, sourceId, item, kind);
   };
 
-  const isItemIncluded = (item) => {
+  const isItemIncluded = (item, kind) => {
     if (!isTrainableItem(item)) return false;
-    if (!matchesSource(item)) return false;
+    if (!matchesSource(item, kind)) return false;
 
     const dirs = direction === "both" ? ["enru", "ruen"] : [direction];
     for (const dir of dirs) {
@@ -266,10 +267,10 @@ export function countTrainingItems(state, opts = {}) {
 
   let n = 0;
   if (content === "words" || content === "all") {
-    n += (state.words || []).filter(isItemIncluded).length;
+    n += (state.words || []).filter((item) => isItemIncluded(item, "word")).length;
   }
   if (content === "phrases" || content === "all") {
-    n += (state.phrases || []).filter(isItemIncluded).length;
+    n += (state.phrases || []).filter((item) => isItemIncluded(item, "phrase")).length;
   }
   return n;
 }

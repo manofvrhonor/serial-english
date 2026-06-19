@@ -2,12 +2,13 @@ import { parseFileContent, parseFileName } from "../core/parser.js";
 import { analyzeText, analyzeSummary, analyzePhrases, phraseSummary } from "../core/analyzer.js";
 import {
   addWords, addPhrases, addStopWord, addKnownWordFromImport, addKnownPhraseFromImport,
-  resolveImportSource, getAppStats,
+  resolveImportSource, setSourceVocabulary, getAppStats,
 } from "../db/database.js";
+import { ensureSnapshotItems } from "../core/readiness.js";
 import { getDictionary, getFormsIndex, translate, translatorUrl } from "../import/dictionary.js";
 import { getPhrases, translatePhrase } from "../import/phrases.js";
 import { attachSwipeCard } from "../ui/swipe-card.js";
-import { transChipsHtml, bindTransChipsContainers } from "../ui/trans-chips.js?v=20260721";
+import { transChipsHtml, bindTransChipsContainers } from "../ui/trans-chips.js?v=20260726";
 import { refreshPageScrollTop, unbindScrollTop } from "../ui/scroll-top.js";
 import { btnLearned, btnStopList } from "../ui/action-icons.js";
 
@@ -143,6 +144,7 @@ async function runAnalyze(el, ctx) {
     session.ui = defaultUi();
     session.totals = { wordAdded: 0, wordUpdated: 0, phraseAdded: 0, phraseUpdated: 0, label: "" };
     initPhases();
+    saveVocabularySnapshot(el, ctx);
     renderResult(el, ctx);
   } catch (err) {
     resultBox.innerHTML = `<div class="card card-padded"><div class="import-error">Ошибка при разборе: ${esc(err.message)}</div></div>`;
@@ -185,17 +187,51 @@ function newPhrasesNoTrans() {
   return session.phrases.filter((p) => !p.removed && isNewPhrase(p) && !hasTranslation(p));
 }
 
+function activeWords() {
+  return session.words.filter((w) => !w.removed);
+}
+
+function activePhrases() {
+  return session.phrases.filter((p) => !p.removed);
+}
+
+function resolveWordsPhase() {
+  if (newWordsWithTrans().length > 0) return "withTrans";
+  if (newWordsNoTrans().length > 0) return "noTrans";
+  if (activeWords().length > 0) return "complete";
+  return "withTrans";
+}
+
+function resolvePhrasesPhase() {
+  if (newPhrasesWithTrans().length > 0) return "withTrans";
+  if (newPhrasesNoTrans().length > 0) return "noTrans";
+  if (activePhrases().length > 0) return "complete";
+  return "withTrans";
+}
+
 function displayWords() {
+  if (session.ui.wordsPhase === "complete") return [];
   return session.ui.wordsPhase === "withTrans" ? newWordsWithTrans() : newWordsNoTrans();
 }
 
 function displayPhrases() {
+  if (session.ui.phrasesPhase === "complete") return [];
   return session.ui.phrasesPhase === "withTrans" ? newPhrasesWithTrans() : newPhrasesNoTrans();
 }
 
+function importTabWordCount() {
+  const visible = displayWords().length;
+  return visible > 0 ? visible : activeWords().length;
+}
+
+function importTabPhraseCount() {
+  const visible = displayPhrases().length;
+  return visible > 0 ? visible : activePhrases().length;
+}
+
 function initPhases() {
-  session.ui.wordsPhase = newWordsWithTrans().length > 0 ? "withTrans" : "noTrans";
-  session.ui.phrasesPhase = newPhrasesWithTrans().length > 0 ? "withTrans" : "noTrans";
+  session.ui.wordsPhase = resolveWordsPhase();
+  session.ui.phrasesPhase = resolvePhrasesPhase();
   syncSelectionToPhases();
 }
 
@@ -215,8 +251,9 @@ function syncSelectionToPhases() {
 function maybeAdvanceWordsPhase(el, ctx) {
   if (session.ui.wordsPhase !== "withTrans") return false;
   if (newWordsWithTrans().length > 0) return false;
-  if (newWordsNoTrans().length === 0) return false;
-  session.ui.wordsPhase = "noTrans";
+  const next = resolveWordsPhase();
+  if (next === "withTrans") return false;
+  session.ui.wordsPhase = next;
   session.ui.stackIndex = 0;
   syncSelectionToPhases();
   renderResult(el, ctx);
@@ -226,8 +263,9 @@ function maybeAdvanceWordsPhase(el, ctx) {
 function maybeAdvancePhrasesPhase(el, ctx) {
   if (session.ui.phrasesPhase !== "withTrans") return false;
   if (newPhrasesWithTrans().length > 0) return false;
-  if (newPhrasesNoTrans().length === 0) return false;
-  session.ui.phrasesPhase = "noTrans";
+  const next = resolvePhrasesPhase();
+  if (next === "withTrans") return false;
+  session.ui.phrasesPhase = next;
   session.ui.stackIndex = 0;
   syncSelectionToPhases();
   renderResult(el, ctx);
@@ -262,22 +300,22 @@ function updateSelectedCount(el, kind) {
 }
 
 function renderResult(el, ctx) {
-  if (session.ui.wordsPhase === "withTrans" && !newWordsWithTrans().length && newWordsNoTrans().length) {
-    session.ui.wordsPhase = "noTrans";
+  if (session.ui.wordsPhase === "withTrans" && !newWordsWithTrans().length) {
+    session.ui.wordsPhase = resolveWordsPhase();
     session.ui.stackIndex = 0;
     syncSelectionToPhases();
   }
-  if (session.ui.phrasesPhase === "withTrans" && !newPhrasesWithTrans().length && newPhrasesNoTrans().length) {
-    session.ui.phrasesPhase = "noTrans";
+  if (session.ui.phrasesPhase === "withTrans" && !newPhrasesWithTrans().length) {
+    session.ui.phrasesPhase = resolvePhrasesPhase();
     session.ui.stackIndex = 0;
     syncSelectionToPhases();
   }
 
   const box = el.querySelector("#import-result");
   box.hidden = false;
-  const wc = displayWords().length;
-  const pc = displayPhrases().length;
-  const hasVisible = wc > 0 || pc > 0;
+  const wc = importTabWordCount();
+  const pc = importTabPhraseCount();
+  const hasVisible = displayWords().length > 0 || displayPhrases().length > 0;
   const { tab, view } = session.ui;
 
   box.innerHTML = `
@@ -291,7 +329,7 @@ function renderResult(el, ctx) {
           <button type="button" class="tab-btn ${tab === "words" ? "active" : ""}" data-tab="words">Слова (${wc})</button>
           <button type="button" class="tab-btn ${tab === "phrases" ? "active" : ""}" data-tab="phrases">Фразы (${pc})</button>
         </div>
-        ${(tab === "words" ? wc : pc) > 0 ? `
+        ${(tab === "words" ? displayWords().length : displayPhrases().length) > 0 ? `
         <div class="tabs import-view-tabs">
           <button type="button" class="tab-btn ${view === "list" ? "active" : ""}" data-view="list">Список</button>
           <button type="button" class="tab-btn ${view === "cards" ? "active" : ""}" data-view="cards">Карточки</button>
@@ -415,16 +453,28 @@ function renderPanel(el, ctx) {
       return;
     }
     if (!displayPhrases().length) {
-      const pending = session.ui.phrasesPhase === "withTrans" && newPhrasesNoTrans().length > 0
-        ? `<p class="list-empty">Выражения с переводом обработаны. Перейдите к фразам без перевода во вкладке «Фразы».</p>`
-        : `<p class="list-empty">Нет новых выражений для импорта — все уже знаете или на изучении.</p>`;
+      const ps = phraseSummary(session.phrases);
+      let pending;
+      if (session.ui.phrasesPhase === "complete" && ps.total > 0) {
+        pending = `<p class="list-empty">Нет новых выражений для импорта — все <strong>${ps.total}</strong> ${pluralPhrases(ps.total)} из файла уже знаете или на изучении.</p>`;
+      } else if (session.ui.phrasesPhase === "withTrans" && newPhrasesNoTrans().length > 0) {
+        pending = `<p class="list-empty">Выражения с переводом обработаны. Перейдите к фразам без перевода во вкладке «Фразы».</p>`;
+      } else {
+        pending = `<p class="list-empty">Нет новых выражений для импорта — все уже знаете или на изучении.</p>`;
+      }
       panel.innerHTML = `${stats}${pending}`;
       return;
     }
   } else if (!displayWords().length) {
-    const pending = session.ui.wordsPhase === "withTrans" && newWordsNoTrans().length > 0
-      ? `<p class="list-empty">Слова с переводом обработаны. Добавьте оставшиеся или перейдите к словам без перевода.</p>`
-      : `<p class="list-empty">Нет новых слов для импорта — все уже знаете, в стоп-листе или на изучении.</p>`;
+    const ws = analyzeSummary(session.words);
+    let pending;
+    if (session.ui.wordsPhase === "complete" && ws.total > 0) {
+      pending = `<p class="list-empty">Нет новых слов для импорта — все <strong>${ws.total}</strong> ${pluralWords(ws.total)} из файла уже знаете, в стоп-листе или на изучении.</p>`;
+    } else if (session.ui.wordsPhase === "withTrans" && newWordsNoTrans().length > 0) {
+      pending = `<p class="list-empty">Слова с переводом обработаны. Добавьте оставшиеся или перейдите к словам без перевода.</p>`;
+    } else {
+      pending = `<p class="list-empty">Нет новых слов для импорта — все уже знаете, в стоп-листе или на изучении.</p>`;
+    }
     panel.innerHTML = `${wordStatsHtml()}${pending}`;
     return;
   }
@@ -446,10 +496,35 @@ function renderPanel(el, ctx) {
   bindImportTransChips(el);
 }
 
+function wordFileSummaryHtml(ws, withTrans, noTrans) {
+  const studyingPart = ws.studyingCount
+    ? ` · на изучении <strong>${ws.studyingCount}</strong>`
+    : "";
+  return `
+    <div class="import-stats import-stats-summary">
+      <p class="import-stats-lead">
+        <strong>${ws.total}</strong> ${pluralWords(ws.total)}:
+        знаете <strong>${ws.knownCount}</strong> ·
+        стоп <strong>${ws.stopCount}</strong> ·
+        без перевода <strong>${ws.noTransCount}</strong> ·
+        новых <strong>${ws.newCount}</strong>${studyingPart}.
+      </p>
+      <p class="import-stats-lead import-stats-phase">
+        Слова с переводом — <strong>${withTrans}</strong><br />
+        Без перевода — <strong>${noTrans}</strong>
+      </p>
+    </div>`;
+}
+
 function wordStatsHtml() {
   const withTrans = newWordsWithTrans().length;
   const noTrans = newWordsNoTrans().length;
   const phase = session.ui.wordsPhase;
+  const ws = analyzeSummary(session.words);
+
+  if (phase === "complete" && ws.total > 0) {
+    return wordFileSummaryHtml(ws, withTrans, noTrans);
+  }
 
   if (phase === "noTrans") {
     return `
@@ -461,18 +536,20 @@ function wordStatsHtml() {
       </div>`;
   }
 
-  const ws = analyzeSummary(session.words);
+  return wordFileSummaryHtml(ws, withTrans, noTrans);
+}
+
+function phraseFileSummaryHtml(ps, withTrans, noTrans) {
   return `
     <div class="import-stats import-stats-summary">
       <p class="import-stats-lead">
-        В этом файле <strong>${ws.total}</strong> уникальных слов:
-        знаю <strong>${ws.knownCount}</strong>,
-        в стоп-листе <strong>${ws.stopCount}</strong>,
-        на изучении <strong>${ws.studyingCount}</strong>,
-        новых <strong>${ws.newCount}</strong>.
+        <strong>${ps.total}</strong> ${pluralPhrases(ps.total)}:
+        знаете <strong>${ps.knownCount}</strong> ·
+        на изучении <strong>${ps.studyingCount}</strong> ·
+        новых <strong>${ps.newCount}</strong>.
       </p>
       <p class="import-stats-lead import-stats-phase">
-        Слова с переводом — <strong>${withTrans}</strong><br />
+        Выражения с переводом — <strong>${withTrans}</strong><br />
         Без перевода — <strong>${noTrans}</strong>
       </p>
     </div>`;
@@ -482,6 +559,11 @@ function phraseStatsHtml() {
   const withTrans = newPhrasesWithTrans().length;
   const noTrans = newPhrasesNoTrans().length;
   const phase = session.ui.phrasesPhase;
+  const ps = phraseSummary(session.phrases);
+
+  if (phase === "complete" && ps.total > 0) {
+    return phraseFileSummaryHtml(ps, withTrans, noTrans);
+  }
 
   if (phase === "noTrans") {
     return `
@@ -493,20 +575,7 @@ function phraseStatsHtml() {
       </div>`;
   }
 
-  const ps = phraseSummary(session.phrases);
-  return `
-    <div class="import-stats import-stats-summary">
-      <p class="import-stats-lead">
-        В этом файле <strong>${ps.total}</strong> выражений:
-        знаю <strong>${ps.knownCount}</strong>,
-        на изучении <strong>${ps.studyingCount}</strong>,
-        новых <strong>${ps.newCount}</strong>.
-      </p>
-      <p class="import-stats-lead import-stats-phase">
-        Выражения с переводом — <strong>${withTrans}</strong><br />
-        Без перевода — <strong>${noTrans}</strong>
-      </p>
-    </div>`;
+  return phraseFileSummaryHtml(ps, withTrans, noTrans);
 }
 
 function pluralWords(n) {
@@ -880,6 +949,22 @@ function resolveTranslations(item) {
   return manual ? [manual] : [];
 }
 
+function saveVocabularySnapshot(el, ctx) {
+  const fields = readMetaFields(el, session.meta);
+  const { sourceId } = resolveImportSource(ctx.state, session.meta, fields);
+  if (!sourceId) return;
+
+  setSourceVocabulary(ctx.state, sourceId, {
+    words: session.words.map((w) => w.lemma),
+    phrases: session.phrases.map((p) => p.text),
+  });
+
+  if (session.dict) {
+    ensureSnapshotItems(ctx.state, sourceId, session.dict, session.phrasesDb);
+  }
+  ctx.save();
+}
+
 function readMetaFields(el, meta) {
   if (meta.kind === "srt") {
     return {
@@ -915,6 +1000,16 @@ function commit(el, ctx) {
 
   const wordRes = wordItems.length ? addWords(ctx.state, wordItems, sourceId) : { added: 0, updated: 0 };
   const phraseRes = phraseItems.length ? addPhrases(ctx.state, phraseItems, sourceId) : { added: 0, updated: 0 };
+
+  if (sourceId) {
+    setSourceVocabulary(ctx.state, sourceId, {
+      words: session.words.map((w) => w.lemma),
+      phrases: session.phrases.map((p) => p.text),
+    });
+    if (session.dict) {
+      ensureSnapshotItems(ctx.state, sourceId, session.dict, session.phrasesDb);
+    }
+  }
   ctx.save();
 
   session.totals.wordAdded += wordRes.added;

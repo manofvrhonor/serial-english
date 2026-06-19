@@ -43,12 +43,17 @@ export function analyzeText(state, text, dict = null, formsIndex = null) {
 }
 
 export function analyzeSummary(words) {
+  const active = words.filter((w) => !w.removed);
+  const isNew = (w) => !w.known && !w.stop && !w.studying;
+  const hasTrans = (w) => (w.translations || []).some(Boolean);
+
   return {
-    total: words.length,
-    newCount: words.filter((w) => !w.removed && !w.known && !w.stop && !w.studying).length,
-    knownCount: words.filter((w) => w.known).length,
-    stopCount: words.filter((w) => w.stop).length,
-    studyingCount: words.filter((w) => w.studying).length,
+    total: active.length,
+    knownCount: active.filter((w) => w.known).length,
+    stopCount: active.filter((w) => w.stop).length,
+    studyingCount: active.filter((w) => w.studying).length,
+    noTransCount: active.filter((w) => !w.known && !w.stop && !hasTrans(w)).length,
+    newCount: active.filter((w) => isNew(w) && hasTrans(w)).length,
   };
 }
 

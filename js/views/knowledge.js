@@ -18,11 +18,11 @@ import {
 } from "../db/database.js";
 import { getDictionary, translate } from "../import/dictionary.js";
 import { getPhrases, translatePhrase } from "../import/phrases.js";
-import { transChipsHtml, bindTransChipsContainers } from "../ui/trans-chips.js?v=20260721";
+import { transChipsHtml, bindTransChipsContainers } from "../ui/trans-chips.js?v=20260726";
 import { btnReturnStudy, btnStopList, btnDeleteWord, btnRemove } from "../ui/action-icons.js";
 import { countTrainingItems } from "../core/srs.js";
-import { mountWordsPanel } from "./study-words.js?v=20260721";
-import { mountPhrasesPanel } from "./study-phrases.js?v=20260721";
+import { mountWordsPanel } from "./study-words.js?v=20260726";
+import { mountPhrasesPanel } from "./study-phrases.js?v=20260726";
 import { bindScrollTop } from "../ui/scroll-top.js";
 
 let section = "studying";
@@ -45,13 +45,51 @@ export function renderKnowledge(el, ctx) {
   draw(el, ctx);
 }
 
-function draw(el, ctx) {
+function getKbStats(ctx) {
   const baseStats = getAppStats(ctx.state);
-  const stats = {
+  return {
     ...baseStats,
     dueWords: countTrainingItems(ctx.state, { content: "words", direction: "both", dueOnly: true }),
     duePhrases: countTrainingItems(ctx.state, { content: "phrases", direction: "both", dueOnly: true }),
   };
+}
+
+function refreshKbStats(el, ctx) {
+  const stats = getKbStats(ctx);
+  const nums = el.querySelectorAll(".kb-stats .stat-num");
+
+  if (subTab === "words" && nums.length >= 4) {
+    nums[0].textContent = stats.words;
+    nums[1].textContent = stats.learnedWords;
+    nums[2].textContent = stats.studyingWords;
+    nums[3].textContent = stats.dueWords;
+  } else if (subTab === "phrases" && nums.length >= 4) {
+    nums[0].textContent = stats.phrases;
+    nums[1].textContent = stats.learnedPhrases;
+    nums[2].textContent = stats.studyingPhrases;
+    nums[3].textContent = stats.duePhrases;
+  }
+
+  const noTrans = section === "studying" ? noTransCount(stats) : 0;
+  const filterBtn = el.querySelector("#kb-filter-notrans");
+  if (noTrans > 0) {
+    if (filterBtn) {
+      filterBtn.textContent = `Без перевода (${noTrans})`;
+    }
+  } else if (filterBtn) {
+    filterBtn.remove();
+    if (filterNoTrans) {
+      filterNoTrans = false;
+      wordsPanel?.setFilterNoTrans(false);
+      phrasesPanel?.setFilterNoTrans(false);
+    }
+  }
+
+  updateAddOfferButton(el, ctx);
+}
+
+function draw(el, ctx) {
+  const stats = getKbStats(ctx);
   el.innerHTML = `
     <div class="page">
     <h1 class="view-title view-title-section">База знаний</h1>
@@ -149,7 +187,7 @@ function refreshKbList(el, ctx) {
 }
 
 function mountStudying(content, ctx, rootEl) {
-  const onChange = () => {};
+  const onChange = () => refreshKbStats(rootEl, ctx);
 
   if (subTab === "words") {
     wordsPanel = mountWordsPanel(content, ctx, {

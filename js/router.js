@@ -1,16 +1,16 @@
-import { renderImport } from "./views/import.js?v=20260721";
+import { renderImport } from "./views/import.js?v=20260726";
 
-import { renderKnowledge } from "./views/knowledge.js?v=20260721";
+import { renderKnowledge } from "./views/knowledge.js?v=20260726";
 
-import { renderTraining } from "./views/training.js?v=20260721";
+import { renderTraining } from "./views/training.js?v=20260726";
 
-import { renderShows } from "./views/shows.js?v=20260721";
+import { renderShows } from "./views/shows.js?v=20260726";
 
-import { renderBooks } from "./views/books.js?v=20260721";
+import { renderBooks } from "./views/books.js?v=20260726";
 
-import { renderSettings } from "./views/settings.js?v=20260721";
+import { renderSettings } from "./views/settings.js?v=20260726";
 
-import { refreshPageScrollTop } from "./ui/scroll-top.js?v=20260721";
+import { refreshPageScrollTop } from "./ui/scroll-top.js?v=20260726";
 
 
 
@@ -74,6 +74,12 @@ export function navigateTo(route, options = {}) {
 
     appCtx.trainingPrep = null;
 
+  }
+
+  if (options.sourceVocab) {
+    appCtx.sourceVocab = options.sourceVocab;
+  } else if (route === "shows" || route === "books") {
+    appCtx.sourceVocab = null;
   }
 
 
@@ -183,6 +189,26 @@ export function initRouter(ctx) {
       trainingPrep: { sourceId, label },
 
     });
+
+  };
+
+  ctx.openSourceVocab = (sourceId, label, backRoute = "shows") => {
+
+    navigateTo(backRoute, {
+
+      sourceVocab: { sourceId, label, backRoute },
+
+    });
+
+  };
+
+  ctx.closeSourceVocab = () => {
+
+    const back = appCtx.sourceVocab?.backRoute || "shows";
+
+    appCtx.sourceVocab = null;
+
+    navigateTo(back);
 
   };
 

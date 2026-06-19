@@ -1111,9 +1111,33 @@ textarea:focus-visible {
 
 .source-ep-label { font-weight: 500; }
 
+.source-ep-badge {
+  font-size: 0.6875rem;
+  font-weight: 500;
+  padding: 0.125rem 0.5rem;
+  border-radius: 999px;
+  background: var(--secondary);
+  color: var(--secondary-foreground);
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
 .source-ep-count {
   font-size: 0.75rem;
   color: var(--muted-foreground);
+}
+
+.source-ep-actions {
+  display: flex;
+  flex-direction: row;
+  gap: 0.375rem;
+}
+
+.source-ep-actions .btn {
+  flex: 1;
+  min-width: 0;
+  font-size: 0.75rem;
+  padding: 0.375rem 0.5rem;
 }
 
 .source-prep-btn {
@@ -1143,6 +1167,105 @@ textarea:focus-visible {
   background: linear-gradient(90deg, var(--primary), var(--success));
   border-radius: 4px;
   transition: width 0.3s;
+}
+
+.prog-bar-thin.prog-bar-multi {
+  display: flex;
+  background: var(--border);
+}
+
+.prog-bar-thin.prog-bar-empty {
+  background: var(--border);
+}
+
+.prog-seg {
+  height: 100%;
+  min-width: 0;
+  transition: width 0.3s;
+}
+
+.prog-seg-known {
+  background: var(--success);
+}
+
+.prog-seg-stop {
+  background: var(--destructive);
+}
+
+.prog-seg-notrans {
+  background: var(--warning);
+}
+
+/* ===== Source vocabulary (серия / глава) ===== */
+.source-vocab-page { max-width: 52rem; }
+
+.source-vocab-top {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+}
+
+.source-vocab-title {
+  margin: 0;
+  flex: 1;
+  min-width: 0;
+}
+
+.source-vocab-stats { margin-bottom: 0.75rem; }
+
+.source-vocab-stats-head {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+  margin-bottom: 0.5rem;
+}
+
+.source-vocab-stats-hint {
+  font-size: 0.75rem;
+  color: var(--muted-foreground);
+  flex: 1;
+  min-width: 0;
+}
+
+.source-vocab-breakdown {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.375rem;
+}
+
+.sv-stat {
+  font-size: 0.6875rem;
+  font-weight: 500;
+  padding: 0.125rem 0.5rem;
+  border-radius: 999px;
+}
+
+.sv-stat-known { background: var(--success-bg); color: var(--success); }
+.sv-stat-stop { background: oklch(from var(--destructive) l c h / 12%); color: var(--destructive); }
+.sv-stat-notrans { background: var(--warning-bg); color: var(--warning); }
+.sv-stat-work { background: var(--secondary); color: var(--secondary-foreground); }
+.sv-stat-new { background: var(--success-bg); color: var(--success); }
+
+.source-vocab-kind-tabs,
+.source-vocab-filter-tabs {
+  margin-bottom: 0.75rem;
+}
+
+.tab-btn-sm {
+  font-size: 0.75rem;
+  padding: 0.375rem 0.625rem;
+}
+
+.tag-known { background: var(--success-bg); color: var(--success); }
+.tag-work { background: var(--secondary); color: var(--secondary-foreground); }
+
+.col-status { width: 6.5rem; white-space: nowrap; }
+
+.sv-trans {
+  font-size: 0.8125rem;
+  color: var(--muted-foreground);
 }
 
 .tree-prep-btn:disabled { opacity: 0.45; cursor: not-allowed; }
