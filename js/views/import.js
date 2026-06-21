@@ -8,7 +8,7 @@ import { ensureSnapshotItems } from "../core/readiness.js";
 import { getDictionary, getFormsIndex, translate, translatorUrl } from "../import/dictionary.js";
 import { getPhrases, translatePhrase } from "../import/phrases.js";
 import { attachSwipeCard } from "../ui/swipe-card.js";
-import { transChipsHtml, bindTransChipsContainers } from "../ui/trans-chips.js?v=20260726";
+import { transChipsHtml, bindTransChipsContainers } from "../ui/trans-chips.js?v=20260621";
 import { refreshPageScrollTop, unbindScrollTop } from "../ui/scroll-top.js";
 import { btnLearned, btnStopList } from "../ui/action-icons.js";
 

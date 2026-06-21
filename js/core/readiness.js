@@ -347,7 +347,7 @@ export function readinessTooltip(readiness) {
 }
 
 export function snapshotProgressBarHtml(readiness) {
-  const { total, known, stop, noTrans } = readiness;
+  const { total, known, stop, noTrans, studying } = readiness;
 
   if (!total) {
     return `<div class="prog-bar-thin prog-bar-empty" title="Нет снимка лексики — импортируйте файл"></div>`;
@@ -355,12 +355,16 @@ export function snapshotProgressBarHtml(readiness) {
 
   const tooltip = readinessTooltip(readiness);
   const knownPct = (known / total) * 100;
+  const studyingPct = (studying / total) * 100;
   const stopPct = (stop / total) * 100;
   const noTransPct = (noTrans / total) * 100;
 
   const segs = [];
   if (knownPct > 0) {
     segs.push(`<div class="prog-seg prog-seg-known" style="width:${knownPct}%"></div>`);
+  }
+  if (studyingPct > 0) {
+    segs.push(`<div class="prog-seg prog-seg-studying" style="width:${studyingPct}%"></div>`);
   }
   if (stopPct > 0) {
     segs.push(`<div class="prog-seg prog-seg-stop" style="width:${stopPct}%"></div>`);

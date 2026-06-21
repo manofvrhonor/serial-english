@@ -18,11 +18,11 @@ import {
 } from "../db/database.js";
 import { getDictionary, translate } from "../import/dictionary.js";
 import { getPhrases, translatePhrase } from "../import/phrases.js";
-import { transChipsHtml, bindTransChipsContainers } from "../ui/trans-chips.js?v=20260726";
+import { transChipsHtml, bindTransChipsContainers } from "../ui/trans-chips.js?v=20260621";
 import { btnReturnStudy, btnStopList, btnDeleteWord, btnRemove } from "../ui/action-icons.js";
 import { countTrainingItems } from "../core/srs.js";
-import { mountWordsPanel } from "./study-words.js?v=20260726";
-import { mountPhrasesPanel } from "./study-phrases.js?v=20260726";
+import { mountWordsPanel } from "./study-words.js?v=20260621";
+import { mountPhrasesPanel } from "./study-phrases.js?v=20260621";
 import { bindScrollTop } from "../ui/scroll-top.js";
 
 let section = "studying";
@@ -98,9 +98,9 @@ function draw(el, ctx) {
     ${statsCardHtml(subTab, stats)}
 
     <div class="tabs kb-section-tabs" id="kb-section-tabs">
-      <button type="button" class="tab-btn${section === "studying" ? " active" : ""}" data-section="studying">На изучении</button>
-      <button type="button" class="tab-btn${section === "learned" ? " active" : ""}" data-section="learned">Выучено</button>
-      <button type="button" class="tab-btn${section === "stoplist" ? " active" : ""}" data-section="stoplist">Стоп-лист</button>
+      <button type="button" class="tab-btn filter-tab-studying${section === "studying" ? " active" : ""}" data-section="studying">На изучении</button>
+      <button type="button" class="tab-btn filter-tab-known${section === "learned" ? " active" : ""}" data-section="learned">Выучено</button>
+      <button type="button" class="tab-btn filter-tab-stop${section === "stoplist" ? " active" : ""}" data-section="stoplist">Стоп-лист</button>
     </div>
 
     ${toolbarHtml(ctx, stats)}
@@ -292,7 +292,7 @@ function toolbarHtml(ctx, stats) {
   const showAdd = shouldShowAddOffer(ctx, query);
   const noTrans = section === "studying" ? noTransCount(stats) : 0;
   const filterBtn = noTrans
-    ? `<button type="button" id="kb-filter-notrans" class="btn btn-sm${filterNoTrans ? " active" : ""}" aria-label="Показать только без перевода">Без перевода (${noTrans})</button>`
+    ? `<button type="button" id="kb-filter-notrans" class="btn btn-sm filter-tab-notrans${filterNoTrans ? " active" : ""}" aria-label="Показать только без перевода">Без перевода (${noTrans})</button>`
     : "";
   return `
     <div class="list-toolbar kb-search-bar">

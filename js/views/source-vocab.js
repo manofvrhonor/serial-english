@@ -2,7 +2,6 @@ import {
   calcReadiness,
   getSnapshotEntries,
   readinessBadge,
-  readinessTooltip,
   ensureSnapshotItems,
   sourceNeedsMaterialize,
 } from "../core/readiness.js";
@@ -20,23 +19,22 @@ import { btnLearned, btnStopList, btnReturnStudy } from "../ui/action-icons.js";
 import { bindScrollTop } from "../ui/scroll-top.js";
 
 const STATUS_FILTERS = [
-  { id: "all", label: "Все" },
   { id: "known", label: "Выучено" },
   { id: "studying", label: "На изучении" },
   { id: "stop", label: "Стоп" },
   { id: "noTrans", label: "Без перевода" },
 ];
 
-const STATUS_TAGS = {
-  known: { label: "Выучено", cls: "tag-known" },
-  stop: { label: "Стоп", cls: "tag-stop" },
-  noTrans: { label: "Без перевода", cls: "tag-missing" },
-  studying: { label: "На изучении", cls: "tag-work" },
+const FILTER_TAB_CLS = {
+  known: "filter-tab-known",
+  studying: "filter-tab-studying",
+  stop: "filter-tab-stop",
+  noTrans: "filter-tab-notrans",
 };
 
 export function renderSourceVocab(el, ctx, meta) {
   let tab = "words";
-  let filter = "all";
+  let filter = "studying";
 
   const draw = async () => {
     const { sourceId, label } = meta;
@@ -52,8 +50,9 @@ export function renderSourceVocab(el, ctx, meta) {
     const readiness = calcReadiness(ctx.state, sourceId);
     const snapshot = getSnapshotEntries(ctx.state, sourceId);
     const entries = tab === "words" ? snapshot.words : snapshot.phrases;
-    const filtered = filter === "all" ? entries : entries.filter((e) => e.status === filter);
+    const filtered = entries.filter((e) => e.status === filter);
     const isEpisode = meta.backRoute === "shows";
+    const statsHtml = renderStatsSection(readiness);
 
     el.innerHTML = `
       <div class="page source-vocab-page">
@@ -61,45 +60,45 @@ export function renderSourceVocab(el, ctx, meta) {
           <button type="button" class="btn btn-sm outline" id="source-vocab-back">← Назад</button>
           <h1 class="view-title view-title-section source-vocab-title">${esc(label)}</h1>
         </div>
-        <p class="view-subtitle">${isEpisode ? "Словарь серии" : "Словарь главы"}</p>
 
+        ${statsHtml ? `
         <section class="card card-padded source-vocab-stats">
-          <div class="source-vocab-stats-head">
-            <span class="source-badge">${readinessBadge(readiness)}</span>
-            <span class="source-vocab-stats-hint" title="${escAttr(readinessTooltip(readiness))}">
-              ${esc(readinessTooltip(readiness))}
-            </span>
-          </div>
-          ${snapshotProgressSummary(readiness)}
-        </section>
+          ${statsHtml}
+        </section>` : ""}
 
         ${!readiness.total ? `
           <div class="card card-padded list-empty">
             Нет данных о лексике. Импортируйте ${isEpisode ? "субтитры .srt" : "текст .txt"} для этого источника.
           </div>` : `
-          <div class="tabs source-vocab-kind-tabs">
-            <button type="button" class="tab-btn${tab === "words" ? " active" : ""}" data-tab="words">Слова (${snapshot.words.length})</button>
-            <button type="button" class="tab-btn${tab === "phrases" ? " active" : ""}" data-tab="phrases">Выражения (${snapshot.phrases.length})</button>
-          </div>
+          <div class="source-vocab-sticky">
+            <div class="tabs source-vocab-kind-tabs">
+              <button type="button" class="tab-btn${tab === "words" ? " active" : ""}" data-tab="words">Слова (${snapshot.words.length})</button>
+              <button type="button" class="tab-btn${tab === "phrases" ? " active" : ""}" data-tab="phrases">Выражения (${snapshot.phrases.length})</button>
+            </div>
 
-          <div class="tabs source-vocab-filter-tabs">
-            ${STATUS_FILTERS.map((f) => `
-              <button type="button" class="tab-btn tab-btn-sm${filter === f.id ? " active" : ""}" data-filter="${f.id}">${f.label}</button>
-            `).join("")}
-          </div>
+            <div class="tabs source-vocab-filter-tabs">
+              ${STATUS_FILTERS.map((f) => `
+                <button type="button" class="tab-btn tab-btn-sm ${FILTER_TAB_CLS[f.id]}${filter === f.id ? " active" : ""}" data-filter="${f.id}">${f.label}</button>
+              `).join("")}
+            </div>
 
-          <div class="card list-card">
-            <div class="list-table-wrap">
-              <table class="list-table list-table-compact">
+            <div class="source-vocab-colhead-wrap">
+              <table class="list-table list-table-compact source-vocab-colhead-table">
                 <thead><tr>
                   <th class="col-word">${tab === "words" ? "Слово" : "Выражение"}</th>
                   <th class="col-trans-cell">Переводы</th>
-                  <th class="col-status">Статус</th>
                   <th class="col-actions"></th>
                 </tr></thead>
+              </table>
+            </div>
+          </div>
+
+          <div class="card list-card source-vocab-list-card">
+            <div class="list-table-wrap">
+              <table class="list-table list-table-compact">
                 <tbody>${filtered.length
                   ? filtered.map((e) => entryRow(e)).join("")
-                  : `<tr><td colspan="4" class="empty-row">Нет элементов в этой категории</td></tr>`}
+                  : `<tr><td colspan="3" class="empty-row">Нет элементов в этой категории</td></tr>`}
                 </tbody>
               </table>
             </div>
@@ -113,7 +112,7 @@ export function renderSourceVocab(el, ctx, meta) {
     el.querySelectorAll("[data-tab]").forEach((btn) => {
       btn.addEventListener("click", () => {
         tab = btn.dataset.tab;
-        filter = "all";
+        filter = "studying";
         draw();
       });
     });
@@ -132,27 +131,36 @@ export function renderSourceVocab(el, ctx, meta) {
   draw();
 }
 
-function snapshotProgressSummary(readiness) {
-  if (!readiness.hasSnapshot || !readiness.total) return "";
+function renderStatsSection(readiness) {
+  if (!readiness.total) return "";
+  const tags = snapshotStatusTags(readiness);
+  return `
+    <div class="source-vocab-stats-head">
+      <span class="source-badge">${readinessBadge(readiness)}</span>
+    </div>
+    ${tags}`;
+}
+
+function snapshotStatusTags(readiness) {
+  if (!readiness.hasSnapshot) return "";
   const parts = [];
+  if (readiness.studying) parts.push(`<span class="sv-stat sv-stat-work">на изучении ${readiness.studying}</span>`);
   if (readiness.known) parts.push(`<span class="sv-stat sv-stat-known">выучено ${readiness.known}</span>`);
   if (readiness.stop) parts.push(`<span class="sv-stat sv-stat-stop">стоп ${readiness.stop}</span>`);
   if (readiness.noTrans) parts.push(`<span class="sv-stat sv-stat-notrans">без перевода ${readiness.noTrans}</span>`);
-  if (readiness.studying) parts.push(`<span class="sv-stat sv-stat-work">на изучении ${readiness.studying}</span>`);
+  if (!parts.length) return "";
   return `<div class="source-vocab-breakdown">${parts.join("")}</div>`;
 }
 
 function entryRow(entry) {
-  const tag = STATUS_TAGS[entry.status] || STATUS_TAGS.studying;
   const trans = (entry.item?.translations || []).filter(Boolean);
-  const transText = trans.length ? trans.slice(0, 3).map((t) => esc(t)).join(" · ") : "—";
+  const transText = trans.length ? trans.map((t) => esc(t)).join(" · ") : "—";
   const keyAttr = escAttr(entry.key);
 
   return `
     <tr data-kind="${entry.kind}" data-key="${keyAttr}" data-status="${entry.status}">
       <td class="col-word"><strong>${esc(entry.key)}</strong></td>
       <td class="col-trans-cell sv-trans">${transText}</td>
-      <td class="col-status"><span class="tag ${tag.cls}">${tag.label}</span></td>
       <td class="col-actions">
         <div class="row-actions">${actionButtons(entry)}</div>
       </td>
