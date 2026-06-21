@@ -339,7 +339,7 @@ export function readinessTooltip(readiness) {
       `стоп ${readiness.stop}`,
       `без перевода ${readiness.noTrans}`,
     ];
-    if (readiness.studying) parts.push(`на изучении ${readiness.studying}`);
+    if (readiness.studying) parts.push(`изучать ${readiness.studying}`);
     return parts.join(" · ");
   }
 

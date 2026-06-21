@@ -498,7 +498,7 @@ function renderPanel(el, ctx) {
 
 function wordFileSummaryHtml(ws, withTrans, noTrans) {
   const studyingPart = ws.studyingCount
-    ? ` · на изучении <strong>${ws.studyingCount}</strong>`
+    ? ` · изучать <strong>${ws.studyingCount}</strong>`
     : "";
   return `
     <div class="import-stats import-stats-summary">
@@ -545,7 +545,7 @@ function phraseFileSummaryHtml(ps, withTrans, noTrans) {
       <p class="import-stats-lead">
         <strong>${ps.total}</strong> ${pluralPhrases(ps.total)}:
         знаете <strong>${ps.knownCount}</strong> ·
-        на изучении <strong>${ps.studyingCount}</strong> ·
+        изучать <strong>${ps.studyingCount}</strong> ·
         новых <strong>${ps.newCount}</strong>.
       </p>
       <p class="import-stats-lead import-stats-phase">
@@ -1069,7 +1069,7 @@ function renderCommitted(el, ctx, { wordRes, phraseRes, label }) {
         Слова: <b>+${wordRes.added}</b> / обновлено <b>${wordRes.updated}</b>.
         Выражения: <b>+${phraseRes.added}</b> / обновлено <b>${phraseRes.updated}</b>.
         Источник: <b>${esc(label || "—")}</b>
-        ${noTrans ? `<p class="import-done-hint c-missing">${noTrans} без перевода — дополните в «База знаний → На изучении» (фильтр «Без перевода»).</p>` : ""}
+        ${noTrans ? `<p class="import-done-hint c-missing">${noTrans} без перевода — дополните в «База знаний → Изучать» (фильтр «Без перевода»).</p>` : ""}
       </div>
       ${(noTrans || addedTotal) ? `
       <div class="import-done-actions">

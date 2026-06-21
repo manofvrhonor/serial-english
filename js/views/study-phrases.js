@@ -12,30 +12,37 @@ import { bindScrollTop } from "../ui/scroll-top.js";
 export function mountPhrasesPanel(mountEl, ctx, options = {}) {
   const panel = { query: options.query ?? "", filterNoTrans: options.filterNoTrans ?? false };
   const prefix = options.prefix ?? "p";
+  const tbodyOnly = options.tbodyOnly ?? false;
+  const rootEl = options.rootEl ?? mountEl;
 
   function draw() {
     const phrases = getFilteredPhrases(ctx.state, panel.query, panel.filterNoTrans);
+    const rowsHtml = phrases.map((p) => rowHtml(p)).join("") || emptyRow();
 
-    mountEl.innerHTML = `
-      <div class="card list-card">
-        <div class="list-table-wrap">
-          <table class="list-table list-table-compact">
-            <thead><tr>
-              <th class="col-word">Выражение</th>
-              <th class="col-trans-cell">Переводы</th>
-              <th class="col-actions"></th>
-            </tr></thead>
-            <tbody id="${prefix}-tbody">${phrases.map((p) => rowHtml(p)).join("") || emptyRow()}</tbody>
-          </table>
-        </div>
-      </div>`;
+    if (tbodyOnly) {
+      mountEl.innerHTML = rowsHtml;
+    } else {
+      mountEl.innerHTML = `
+        <div class="card list-card">
+          <div class="list-table-wrap">
+            <table class="list-table list-table-compact">
+              <thead><tr>
+                <th class="col-word">Выражение</th>
+                <th class="col-trans-cell">Переводы</th>
+                <th class="col-actions"></th>
+              </tr></thead>
+              <tbody id="${prefix}-tbody">${rowsHtml}</tbody>
+            </table>
+          </div>
+        </div>`;
+    }
 
-    bindActions(mountEl, ctx, prefix, () => {
+    bindActions(rootEl, ctx, prefix, () => {
       options.onChange?.();
       draw();
-    });
+    }, tbodyOnly ? mountEl : null);
 
-    bindScrollTop();
+    if (!tbodyOnly) bindScrollTop();
   }
 
   draw();
@@ -90,7 +97,7 @@ function rowHtml(p) {
     </tr>`;
 }
 
-function bindActions(el, ctx, prefix, onDone) {
+function bindActions(el, ctx, prefix, onDone, tbodyEl = null) {
   bindTransChipsContainers(el, {
     onChange(id, translations) {
       updatePhrase(ctx.state, id, { translations });
@@ -98,7 +105,8 @@ function bindActions(el, ctx, prefix, onDone) {
     },
   });
 
-  el.querySelector(`#${prefix}-tbody`)?.querySelectorAll("[data-act]").forEach((btn) => {
+  const tbody = tbodyEl || el.querySelector(`#${prefix}-tbody`);
+  tbody?.querySelectorAll("[data-act]").forEach((btn) => {
     btn.addEventListener("click", () => {
       const id = btn.dataset.id;
       if (btn.dataset.act === "learn") {

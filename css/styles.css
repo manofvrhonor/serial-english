@@ -1195,31 +1195,58 @@ textarea:focus-visible {
   background: var(--warning);
 }
 
-/* ===== Source vocabulary (серия / глава) ===== */
-.source-vocab-page { max-width: 52rem; }
+/* ===== Source vocabulary (серия / глава) & Knowledge base ===== */
+.source-vocab-page,
+.kb-page { max-width: 52rem; }
+
+/* Sticky-шапка липнет к верху scrollport; у .content убираем padding-top,
+   отступ переносим на верх страницы — иначе при скролле слова просвечивают сверху. */
+.content:has(.source-vocab-page),
+.content:has(.kb-page) {
+  padding-top: 0;
+}
+
+@media (min-width: 768px) {
+  .content:has(.source-vocab-page),
+  .content:has(.kb-page) {
+    padding-top: 0;
+  }
+}
+
+.source-vocab-page > .source-vocab-top {
+  padding-top: calc(1rem + env(safe-area-inset-top, 0px));
+}
+
+.kb-page > .kb-title {
+  padding-top: calc(1rem + env(safe-area-inset-top, 0px));
+}
+
+@media (min-width: 768px) {
+  .source-vocab-page > .source-vocab-top,
+  .kb-page > .kb-title {
+    padding-top: 1.5rem;
+  }
+}
 
 .source-vocab-top {
   display: flex;
   align-items: center;
+  justify-content: space-between;
   gap: 0.75rem;
-  flex-wrap: wrap;
-}
-
-.source-vocab-title {
-  margin: 0;
-  flex: 1;
-  min-width: 0;
-}
-
-.source-vocab-stats { margin-bottom: 0.75rem; }
-
-.source-vocab-stats-head {
-  display: flex;
-  align-items: center;
-  gap: 0.75rem;
-  flex-wrap: wrap;
   margin-bottom: 0.5rem;
 }
+
+.source-vocab-ready-badge {
+  flex-shrink: 0;
+}
+
+.source-vocab-title,
+.kb-title {
+  margin: 0 0 0.75rem;
+}
+
+.source-vocab-stats,
+.kb-stats { margin-bottom: 0.75rem; }
 
 .source-vocab-stats-hint {
   font-size: 0.75rem;
@@ -1250,6 +1277,16 @@ textarea:focus-visible {
 .source-vocab-kind-tabs,
 .source-vocab-filter-tabs {
   margin-bottom: 0.75rem;
+}
+
+.source-vocab-kind-tabs {
+  display: flex;
+  width: 100%;
+}
+
+.source-vocab-kind-tabs .tab-btn {
+  flex: 1;
+  text-align: center;
 }
 
 .source-vocab-sticky {
@@ -1283,14 +1320,16 @@ textarea:focus-visible {
   border-bottom: 1px solid var(--border);
 }
 
-.source-vocab-page .source-vocab-list-card {
+.source-vocab-page .source-vocab-list-card,
+.kb-page .kb-list-card {
   overflow: visible;
   border-top: none;
   border-radius: 0 0 var(--radius-lg) var(--radius-lg);
   margin-top: 0;
 }
 
-.source-vocab-page .source-vocab-list-card .list-table-wrap {
+.source-vocab-page .source-vocab-list-card .list-table-wrap,
+.kb-page .kb-list-card .list-table-wrap {
   border: none;
   border-radius: 0;
   overflow: visible;
@@ -1402,35 +1441,12 @@ textarea:focus-visible {
 }
 
 /* ===== Knowledge hub ===== */
+.kb-search-bar {
+  margin-bottom: 0.75rem;
+}
+
 .kb-search-bar .list-search { flex: 1; min-width: 0; }
 .kb-search-bar #kb-add-offer { flex-shrink: 0; white-space: nowrap; }
-
-.kb-type-tabs {
-  display: flex;
-  width: 100%;
-  margin-bottom: 1rem;
-}
-
-.kb-type-tabs .tab-btn {
-  flex: 1;
-  text-align: center;
-  font-weight: 600;
-}
-
-.kb-stats { margin-bottom: 1rem; }
-
-.kb-stop-hint { margin: 0; flex: 1; }
-
-.kb-settings-stats { grid-template-columns: repeat(4, 1fr); }
-@media (max-width: 640px) {
-  .kb-settings-stats { grid-template-columns: repeat(2, 1fr); }
-}
-
-@media (max-width: 480px) {
-  .kb-settings-stats { gap: 8px; }
-  .kb-settings-stats .stat-item { padding: 0.625rem 0.375rem; font-size: 0.8125rem; }
-  .kb-settings-stats .stat-num { font-size: 1.125rem; }
-}
 
 /* ===== Modal (HARD RESET) ===== */
 .modal[hidden] { display: none !important; }
@@ -1520,7 +1536,7 @@ textarea:focus-visible {
 
 /* Status-colored tabs — после .tab-btn.active, иначе белый фон перебивает цвет */
 .source-vocab-filter-tabs,
-.kb-section-tabs {
+.kb-filter-tabs {
   display: flex;
   flex-wrap: wrap;
   width: 100%;
@@ -1529,12 +1545,8 @@ textarea:focus-visible {
   background: transparent;
 }
 
-.kb-section-tabs {
-  margin-bottom: 1rem;
-}
-
 .source-vocab-filter-tabs .tab-btn,
-.kb-section-tabs .tab-btn {
+.kb-filter-tabs .tab-btn {
   flex: 1 1 0;
   min-width: 3.25rem;
   display: inline-flex;
@@ -1549,80 +1561,71 @@ textarea:focus-visible {
 }
 
 .source-vocab-filter-tabs .filter-tab-known,
-.kb-section-tabs .filter-tab-known {
+.kb-filter-tabs .filter-tab-known {
   background: var(--success-bg);
   color: var(--success);
 }
 
 .source-vocab-filter-tabs .filter-tab-known.active,
-.kb-section-tabs .filter-tab-known.active {
+.kb-filter-tabs .filter-tab-known.active {
   background: var(--success-bg);
   color: var(--success);
   box-shadow: inset 0 0 0 2px var(--success);
 }
 
 .source-vocab-filter-tabs .filter-tab-studying,
-.kb-section-tabs .filter-tab-studying {
+.kb-filter-tabs .filter-tab-studying {
   background: var(--secondary);
   color: var(--secondary-foreground);
 }
 
 .source-vocab-filter-tabs .filter-tab-studying.active,
-.kb-section-tabs .filter-tab-studying.active {
+.kb-filter-tabs .filter-tab-studying.active {
   background: var(--secondary);
   color: var(--secondary-foreground);
   box-shadow: inset 0 0 0 2px var(--muted-foreground);
 }
 
 .source-vocab-filter-tabs .filter-tab-stop,
-.kb-section-tabs .filter-tab-stop {
+.kb-filter-tabs .filter-tab-stop {
   background: oklch(from var(--destructive) l c h / 12%);
   color: var(--destructive);
 }
 
 .source-vocab-filter-tabs .filter-tab-stop.active,
-.kb-section-tabs .filter-tab-stop.active {
+.kb-filter-tabs .filter-tab-stop.active {
   background: oklch(from var(--destructive) l c h / 12%);
   color: var(--destructive);
   box-shadow: inset 0 0 0 2px var(--destructive);
 }
 
 .source-vocab-filter-tabs .filter-tab-notrans,
-.kb-section-tabs .filter-tab-notrans {
+.kb-filter-tabs .filter-tab-notrans {
   background: var(--warning-bg);
   color: var(--warning);
 }
 
 .source-vocab-filter-tabs .filter-tab-notrans.active,
-.kb-section-tabs .filter-tab-notrans.active {
+.kb-filter-tabs .filter-tab-notrans.active {
   background: var(--warning-bg);
   color: var(--warning);
   box-shadow: inset 0 0 0 2px var(--warning);
 }
 
-#kb-filter-notrans.filter-tab-notrans {
-  background: var(--warning-bg);
-  color: var(--warning);
-}
-
-#kb-filter-notrans.filter-tab-notrans.active {
-  background: var(--warning-bg);
-  color: var(--warning);
-  border-color: var(--warning);
-  box-shadow: inset 0 0 0 2px var(--warning);
-}
-
-.source-vocab-page .list-table-compact .col-word {
+.source-vocab-page .list-table-compact .col-word,
+.kb-page .list-table-compact .col-word {
   width: 24%;
   vertical-align: top;
 }
 
-.source-vocab-page .list-table-compact .col-trans-cell {
+.source-vocab-page .list-table-compact .col-trans-cell,
+.kb-page .list-table-compact .col-trans-cell {
   word-break: break-word;
   overflow-wrap: anywhere;
 }
 
-.source-vocab-page .list-table-compact .col-actions {
+.source-vocab-page .list-table-compact .col-actions,
+.kb-page .list-table-compact .col-actions {
   width: 5.25rem;
   vertical-align: middle;
 }

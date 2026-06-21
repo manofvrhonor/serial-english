@@ -6,6 +6,14 @@ import {
   sourceNeedsMaterialize,
 } from "../core/readiness.js";
 import {
+  findWordById,
+  findPhraseById,
+  findWordByLemma,
+  findPhraseByText,
+  updateWord,
+  updatePhrase,
+  addWords,
+  addPhrases,
   markWordLearned,
   markPhraseLearned,
   deleteWord,
@@ -16,11 +24,12 @@ import {
 import { getDictionary } from "../import/dictionary.js";
 import { getPhrases } from "../import/phrases.js";
 import { btnLearned, btnStopList, btnReturnStudy } from "../ui/action-icons.js";
+import { transChipsHtml, bindTransChipsContainers } from "../ui/trans-chips.js?v=20260621";
 import { bindScrollTop } from "../ui/scroll-top.js";
 
 const STATUS_FILTERS = [
   { id: "known", label: "Выучено" },
-  { id: "studying", label: "На изучении" },
+  { id: "studying", label: "Изучать" },
   { id: "stop", label: "Стоп" },
   { id: "noTrans", label: "Без перевода" },
 ];
@@ -52,18 +61,22 @@ export function renderSourceVocab(el, ctx, meta) {
     const entries = tab === "words" ? snapshot.words : snapshot.phrases;
     const filtered = entries.filter((e) => e.status === filter);
     const isEpisode = meta.backRoute === "shows";
-    const statsHtml = renderStatsSection(readiness);
+    const statsTagsHtml = renderStatsTags(readiness);
+    const readyBadgeHtml = readiness.total
+      ? `<span class="source-badge source-vocab-ready-badge">${readinessBadge(readiness)}</span>`
+      : "";
 
     el.innerHTML = `
       <div class="page source-vocab-page">
         <div class="source-vocab-top">
           <button type="button" class="btn btn-sm outline" id="source-vocab-back">← Назад</button>
-          <h1 class="view-title view-title-section source-vocab-title">${esc(label)}</h1>
+          ${readyBadgeHtml}
         </div>
+        <h1 class="view-title view-title-section source-vocab-title">${esc(label)}</h1>
 
-        ${statsHtml ? `
+        ${statsTagsHtml ? `
         <section class="card card-padded source-vocab-stats">
-          ${statsHtml}
+          ${statsTagsHtml}
         </section>` : ""}
 
         ${!readiness.total ? `
@@ -97,7 +110,7 @@ export function renderSourceVocab(el, ctx, meta) {
             <div class="list-table-wrap">
               <table class="list-table list-table-compact">
                 <tbody>${filtered.length
-                  ? filtered.map((e) => entryRow(e)).join("")
+                  ? filtered.map((e) => entryRow(e, ctx.state)).join("")
                   : `<tr><td colspan="3" class="empty-row">Нет элементов в этой категории</td></tr>`}
                 </tbody>
               </table>
@@ -124,6 +137,11 @@ export function renderSourceVocab(el, ctx, meta) {
       });
     });
 
+    bindTransChipsContainers(el, {
+      onChange(chipId, translations) {
+        handleTranslationChange(ctx, meta, chipId, translations, draw);
+      },
+    });
     bindRowActions(el, ctx, draw);
     bindScrollTop();
   };
@@ -131,20 +149,15 @@ export function renderSourceVocab(el, ctx, meta) {
   draw();
 }
 
-function renderStatsSection(readiness) {
+function renderStatsTags(readiness) {
   if (!readiness.total) return "";
-  const tags = snapshotStatusTags(readiness);
-  return `
-    <div class="source-vocab-stats-head">
-      <span class="source-badge">${readinessBadge(readiness)}</span>
-    </div>
-    ${tags}`;
+  return snapshotStatusTags(readiness);
 }
 
 function snapshotStatusTags(readiness) {
   if (!readiness.hasSnapshot) return "";
   const parts = [];
-  if (readiness.studying) parts.push(`<span class="sv-stat sv-stat-work">на изучении ${readiness.studying}</span>`);
+  if (readiness.studying) parts.push(`<span class="sv-stat sv-stat-work">изучать ${readiness.studying}</span>`);
   if (readiness.known) parts.push(`<span class="sv-stat sv-stat-known">выучено ${readiness.known}</span>`);
   if (readiness.stop) parts.push(`<span class="sv-stat sv-stat-stop">стоп ${readiness.stop}</span>`);
   if (readiness.noTrans) parts.push(`<span class="sv-stat sv-stat-notrans">без перевода ${readiness.noTrans}</span>`);
@@ -152,19 +165,101 @@ function snapshotStatusTags(readiness) {
   return `<div class="source-vocab-breakdown">${parts.join("")}</div>`;
 }
 
-function entryRow(entry) {
-  const trans = (entry.item?.translations || []).filter(Boolean);
-  const transText = trans.length ? trans.map((t) => esc(t)).join(" · ") : "—";
+function entryRow(entry, state) {
   const keyAttr = escAttr(entry.key);
+  const itemId = entry.item?.id ? escAttr(entry.item.id) : "";
 
   return `
-    <tr data-kind="${entry.kind}" data-key="${keyAttr}" data-status="${entry.status}">
+    <tr data-kind="${entry.kind}" data-key="${keyAttr}" data-status="${entry.status}"${itemId ? ` data-item-id="${itemId}"` : ""}>
       <td class="col-word"><strong>${esc(entry.key)}</strong></td>
-      <td class="col-trans-cell sv-trans">${transText}</td>
+      <td class="col-trans-cell">${transCellHtml(entry, state)}</td>
       <td class="col-actions">
         <div class="row-actions">${actionButtons(entry)}</div>
       </td>
     </tr>`;
+}
+
+function canEditTranslations(entry) {
+  if (entry.status === "stop") return false;
+  if (entry.item?.id) return true;
+  return entry.status === "noTrans" || entry.status === "studying";
+}
+
+function transCellHtml(entry, state) {
+  if (!canEditTranslations(entry)) {
+    const trans = displayTranslations(state, entry);
+    const transText = trans.length ? trans.map((t) => esc(t)).join(" · ") : "—";
+    return `<span class="sv-trans">${transText}</span>`;
+  }
+
+  const trans = (entry.item?.translations || []).filter(Boolean);
+  return transChipsHtml(trans, { id: transChipId(entry) });
+}
+
+function displayTranslations(state, entry) {
+  if (entry.status === "stop" && entry.kind === "word") {
+    const l = entry.key.toLowerCase().trim();
+    const stopEntry = (state.settings?.stopList || []).find((x) => {
+      const lemma = typeof x === "string" ? x : x?.lemma;
+      return String(lemma ?? "").toLowerCase().trim() === l;
+    });
+    if (stopEntry && typeof stopEntry === "object") {
+      return (stopEntry.translations || []).filter(Boolean);
+    }
+    return [];
+  }
+  return (entry.item?.translations || []).filter(Boolean);
+}
+
+function transChipId(entry) {
+  if (entry.item?.id) return entry.item.id;
+  return `sv-pending:${entry.kind}:${encodeURIComponent(entry.key)}`;
+}
+
+function parsePendingChipId(chipId) {
+  const m = /^sv-pending:(word|phrase):(.+)$/.exec(chipId);
+  if (!m) return null;
+  return { kind: m[1], key: decodeURIComponent(m[2]) };
+}
+
+function handleTranslationChange(ctx, meta, chipId, translations, redraw) {
+  const word = findWordById(ctx.state, chipId);
+  if (word) {
+    updateWord(ctx.state, chipId, { translations });
+    ctx.save();
+    redraw();
+    return;
+  }
+
+  const phrase = findPhraseById(ctx.state, chipId);
+  if (phrase) {
+    updatePhrase(ctx.state, chipId, { translations });
+    ctx.save();
+    redraw();
+    return;
+  }
+
+  const pending = parsePendingChipId(chipId);
+  if (!pending) return;
+
+  if (pending.kind === "word") {
+    const existing = findWordByLemma(ctx.state, pending.key);
+    if (existing) {
+      updateWord(ctx.state, existing.id, { translations });
+    } else {
+      addWords(ctx.state, [{ lemma: pending.key, translations }], meta.sourceId);
+    }
+  } else {
+    const existing = findPhraseByText(ctx.state, pending.key);
+    if (existing) {
+      updatePhrase(ctx.state, existing.id, { translations });
+    } else {
+      addPhrases(ctx.state, [{ text: pending.key, translations }], meta.sourceId);
+    }
+  }
+
+  ctx.save();
+  redraw();
 }
 
 function actionButtons(entry) {
