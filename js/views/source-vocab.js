@@ -61,7 +61,7 @@ export function renderSourceVocab(el, ctx, meta) {
     const entries = tab === "words" ? snapshot.words : snapshot.phrases;
     const filtered = entries.filter((e) => e.status === filter);
     const isEpisode = meta.backRoute === "shows";
-    const statsTagsHtml = renderStatsTags(readiness);
+    const filterCounts = getFilterCounts(entries);
     const readyBadgeHtml = readiness.total
       ? `<span class="source-badge source-vocab-ready-badge">${readinessBadge(readiness)}</span>`
       : "";
@@ -74,11 +74,6 @@ export function renderSourceVocab(el, ctx, meta) {
         </div>
         <h1 class="view-title view-title-section source-vocab-title">${esc(label)}</h1>
 
-        ${statsTagsHtml ? `
-        <section class="card card-padded source-vocab-stats">
-          ${statsTagsHtml}
-        </section>` : ""}
-
         ${!readiness.total ? `
           <div class="card card-padded list-empty">
             Нет данных о лексике. Импортируйте ${isEpisode ? "субтитры .srt" : "текст .txt"} для этого источника.
@@ -90,9 +85,7 @@ export function renderSourceVocab(el, ctx, meta) {
             </div>
 
             <div class="tabs source-vocab-filter-tabs">
-              ${STATUS_FILTERS.map((f) => `
-                <button type="button" class="tab-btn tab-btn-sm ${FILTER_TAB_CLS[f.id]}${filter === f.id ? " active" : ""}" data-filter="${f.id}">${f.label}</button>
-              `).join("")}
+              ${STATUS_FILTERS.map((f) => filterTabBtnHtml(f, filterCounts[f.id] ?? 0, filter === f.id)).join("")}
             </div>
 
             <div class="source-vocab-colhead-wrap">
@@ -149,20 +142,21 @@ export function renderSourceVocab(el, ctx, meta) {
   draw();
 }
 
-function renderStatsTags(readiness) {
-  if (!readiness.total) return "";
-  return snapshotStatusTags(readiness);
+function getFilterCounts(entries) {
+  const counts = { known: 0, studying: 0, stop: 0, noTrans: 0 };
+  for (const e of entries) {
+    if (e.status in counts) counts[e.status]++;
+  }
+  return counts;
 }
 
-function snapshotStatusTags(readiness) {
-  if (!readiness.hasSnapshot) return "";
-  const parts = [];
-  if (readiness.studying) parts.push(`<span class="sv-stat sv-stat-work">изучать ${readiness.studying}</span>`);
-  if (readiness.known) parts.push(`<span class="sv-stat sv-stat-known">выучено ${readiness.known}</span>`);
-  if (readiness.stop) parts.push(`<span class="sv-stat sv-stat-stop">стоп ${readiness.stop}</span>`);
-  if (readiness.noTrans) parts.push(`<span class="sv-stat sv-stat-notrans">без перевода ${readiness.noTrans}</span>`);
-  if (!parts.length) return "";
-  return `<div class="source-vocab-breakdown">${parts.join("")}</div>`;
+function filterTabBtnHtml(f, count, active) {
+  const cls = FILTER_TAB_CLS[f.id];
+  return `
+    <button type="button" class="tab-btn tab-btn-sm tab-btn-stat ${cls}${active ? " active" : ""}" data-filter="${f.id}">
+      <span class="tab-btn-label">${f.label}</span>
+      <span class="tab-btn-num">${count}</span>
+    </button>`;
 }
 
 function entryRow(entry, state) {

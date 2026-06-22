@@ -496,23 +496,24 @@ function renderPanel(el, ctx) {
   bindImportTransChips(el);
 }
 
-function wordFileSummaryHtml(ws, withTrans, noTrans) {
-  const studyingPart = ws.studyingCount
-    ? ` · изучать <strong>${ws.studyingCount}</strong>`
+function wordFileSummaryHtml(ws, withTrans, noTrans, showPhaseBreakdown = false) {
+  const phasePart = showPhaseBreakdown
+    ? `<p class="import-stats-lead import-stats-phase">
+        Слова с переводом — <strong>${withTrans}</strong><br />
+        Без перевода — <strong>${noTrans}</strong>
+      </p>`
     : "";
   return `
     <div class="import-stats import-stats-summary">
       <p class="import-stats-lead">
         <strong>${ws.total}</strong> ${pluralWords(ws.total)}:
+        новых <strong>${ws.newCount}</strong> ·
         знаете <strong>${ws.knownCount}</strong> ·
-        стоп <strong>${ws.stopCount}</strong> ·
+        изучаете <strong>${ws.studyingCount}</strong> ·
         без перевода <strong>${ws.noTransCount}</strong> ·
-        новых <strong>${ws.newCount}</strong>${studyingPart}.
+        стоп <strong>${ws.stopCount}</strong>.
       </p>
-      <p class="import-stats-lead import-stats-phase">
-        Слова с переводом — <strong>${withTrans}</strong><br />
-        Без перевода — <strong>${noTrans}</strong>
-      </p>
+      ${phasePart}
     </div>`;
 }
 
@@ -523,7 +524,7 @@ function wordStatsHtml() {
   const ws = analyzeSummary(session.words);
 
   if (phase === "complete" && ws.total > 0) {
-    return wordFileSummaryHtml(ws, withTrans, noTrans);
+    return wordFileSummaryHtml(ws, withTrans, noTrans, false);
   }
 
   if (phase === "noTrans") {
@@ -536,22 +537,25 @@ function wordStatsHtml() {
       </div>`;
   }
 
-  return wordFileSummaryHtml(ws, withTrans, noTrans);
+  return wordFileSummaryHtml(ws, withTrans, noTrans, true);
 }
 
-function phraseFileSummaryHtml(ps, withTrans, noTrans) {
+function phraseFileSummaryHtml(ps, withTrans, noTrans, showPhaseBreakdown = false) {
+  const phasePart = showPhaseBreakdown
+    ? `<p class="import-stats-lead import-stats-phase">
+        Выражения с переводом — <strong>${withTrans}</strong><br />
+        Без перевода — <strong>${noTrans}</strong>
+      </p>`
+    : "";
   return `
     <div class="import-stats import-stats-summary">
       <p class="import-stats-lead">
         <strong>${ps.total}</strong> ${pluralPhrases(ps.total)}:
+        новых <strong>${ps.newCount}</strong> ·
         знаете <strong>${ps.knownCount}</strong> ·
-        изучать <strong>${ps.studyingCount}</strong> ·
-        новых <strong>${ps.newCount}</strong>.
+        изучаете <strong>${ps.studyingCount}</strong>.
       </p>
-      <p class="import-stats-lead import-stats-phase">
-        Выражения с переводом — <strong>${withTrans}</strong><br />
-        Без перевода — <strong>${noTrans}</strong>
-      </p>
+      ${phasePart}
     </div>`;
 }
 
@@ -562,7 +566,7 @@ function phraseStatsHtml() {
   const ps = phraseSummary(session.phrases);
 
   if (phase === "complete" && ps.total > 0) {
-    return phraseFileSummaryHtml(ps, withTrans, noTrans);
+    return phraseFileSummaryHtml(ps, withTrans, noTrans, false);
   }
 
   if (phase === "noTrans") {
@@ -575,7 +579,7 @@ function phraseStatsHtml() {
       </div>`;
   }
 
-  return phraseFileSummaryHtml(ps, withTrans, noTrans);
+  return phraseFileSummaryHtml(ps, withTrans, noTrans, true);
 }
 
 function pluralWords(n) {

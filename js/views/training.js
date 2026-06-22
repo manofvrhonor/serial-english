@@ -296,17 +296,25 @@ function renderPromptOnly(card) {
   return `<div class="train-prompt">${esc(card.prompt)}</div>`;
 }
 
+function isCorrectOption(card, option) {
+  return option?.itemId === card.itemId;
+}
+
+function findOption(card, itemId) {
+  return card.options.find((o) => o.itemId === itemId);
+}
+
 function renderOptionsBlock(card, answered, feedbackHtml = "") {
   const options = card.options.map((opt) => {
-    const isCorrect = answered && opt.toLowerCase() === card.answer.toLowerCase();
+    const isCorrect = answered && isCorrectOption(card, opt);
     const classes = ["train-option"];
     if (answered) {
       if (isCorrect) classes.push("train-option-correct");
     }
     return `
-      <button type="button" class="${classes.join(" ")}" data-opt="${escAttr(opt)}"
-        aria-label="Вариант: ${escAttr(opt)}" ${answered ? "disabled" : ""}>
-        ${answered && isCorrect ? ICON_CHECK : ""}${esc(opt)}
+      <button type="button" class="${classes.join(" ")}" data-item-id="${escAttr(opt.itemId)}"
+        aria-label="Вариант: ${escAttr(opt.label)}" ${answered ? "disabled" : ""}>
+        ${answered && isCorrect ? ICON_CHECK : ""}${esc(opt.label)}
       </button>`;
   }).join("");
 
@@ -363,13 +371,14 @@ function bindCardEvents(el, ctx) {
   el.querySelectorAll(".train-option").forEach((btn) => {
     btn.addEventListener("click", () => {
       if (session.answered) return;
-      const chosen = btn.dataset.opt;
-      const correct = chosen.toLowerCase() === card.answer.toLowerCase();
+      const option = findOption(card, btn.dataset.itemId);
+      const correct = isCorrectOption(card, option);
       session.answered = true;
 
       el.querySelectorAll(".train-option").forEach((b) => {
         b.disabled = true;
-        const isAns = b.dataset.opt.toLowerCase() === card.answer.toLowerCase();
+        const rowOpt = findOption(card, b.dataset.itemId);
+        const isAns = isCorrectOption(card, rowOpt);
         const isPicked = b === btn;
         if (isAns) {
           b.classList.add("train-option-correct");

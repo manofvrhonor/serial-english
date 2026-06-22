@@ -1,5 +1,5 @@
-import { loadState, saveState } from "./db/database.js?v=20260628";
-import { initRouter } from "./router.js?v=20260628";
+import { loadState, saveState } from "./db/database.js?v=20260639";
+import { initRouter } from "./router.js?v=20260639";
 
 // Глобальный контекст приложения — живёт в памяти всё время работы
 const ctx = {

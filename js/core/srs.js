@@ -69,15 +69,33 @@ export function pickWeightedTranslation(translations) {
   return list[0];
 }
 
+export function getItemTranslations(item) {
+  return (item.translations || []).filter(Boolean).slice(0, 3);
+}
+
+export function formatTranslations(translations, separator = " · ") {
+  return getItemTranslations({ translations }).join(separator);
+}
+
 function getEnglish(item, kind) {
   return kind === "word" ? item.lemma : item.text;
 }
 
-function distractorText(item, kind, direction) {
-  const trans = (item.translations || []).filter(Boolean);
-  if (!trans.length) return "";
-  if (direction === "enru") return pickWeightedTranslation(trans);
-  return kind === "word" ? item.lemma : item.text;
+function choiceOptionForItem(item, kind, direction) {
+  const english = getEnglish(item, kind);
+  const allTrans = getItemTranslations(item);
+  if (direction === "enru") {
+    return {
+      itemId: item.id,
+      label: formatTranslations(allTrans),
+      acceptable: allTrans,
+    };
+  }
+  return {
+    itemId: item.id,
+    label: english,
+    acceptable: [english],
+  };
 }
 
 function collectDistractorCandidates(state, kind, direction, excludeId) {
@@ -86,12 +104,12 @@ function collectDistractorCandidates(state, kind, direction, excludeId) {
 
   const tryAdd = (it, k) => {
     if (it.id === excludeId) return;
-    const text = distractorText(it, k, direction);
-    if (!text) return;
-    const key = text.toLowerCase();
+    const opt = choiceOptionForItem(it, k, direction);
+    if (!opt.label) return;
+    const key = opt.label.toLowerCase();
     if (seen.has(key)) return;
     seen.add(key);
-    candidates.push({ text, id: it.id });
+    candidates.push(opt);
   };
 
   const scan = (items, k, filterFn) => {
@@ -122,36 +140,43 @@ export function canUseChoiceMode(state, content = "words") {
   return trainable(state.words) >= 4 && trainable(state.phrases) >= 4;
 }
 
-export function buildOptions(state, item, kind, direction, correct) {
-  const correctKey = String(correct).toLowerCase();
+export function buildOptions(state, item, kind, direction, acceptableAnswers = null) {
+  const correctOpt = choiceOptionForItem(item, kind, direction);
+  const excludeKeys = new Set(
+    (acceptableAnswers?.length ? acceptableAnswers : correctOpt.acceptable)
+      .map((a) => String(a).toLowerCase())
+  );
   const pool = shuffleArray(
     collectDistractorCandidates(state, kind, direction, item.id)
-      .filter((c) => c.text.toLowerCase() !== correctKey)
+      .filter((c) => !c.acceptable.some((a) => excludeKeys.has(String(a).toLowerCase())))
+      .filter((c) => c.label.toLowerCase() !== correctOpt.label.toLowerCase())
   );
 
   const wrong = [];
   for (const c of pool) {
     if (wrong.length >= 3) break;
-    if (!wrong.some((x) => x.toLowerCase() === c.text.toLowerCase())) wrong.push(c.text);
+    if (!wrong.some((x) => x.label.toLowerCase() === c.label.toLowerCase())) wrong.push(c);
   }
 
   if (wrong.length < 3) return null;
 
-  return shuffleArray([correct, ...wrong.slice(0, 3)]);
+  return shuffleArray([correctOpt, ...wrong.slice(0, 3)]);
 }
 
 export function prepareCard(state, entry, mode) {
   const { kind, item, direction } = entry;
   const english = getEnglish(item, kind);
-  const correctTrans = pickWeightedTranslation(item.translations);
+  const allTrans = getItemTranslations(item);
+  const translationsText = formatTranslations(allTrans);
 
-  const prompt = direction === "enru" ? english : correctTrans;
-  const answer = direction === "enru" ? correctTrans : english;
+  const prompt = direction === "enru" ? english : translationsText;
+  const answer = direction === "enru" ? translationsText : english;
+  const acceptableAnswers = direction === "enru" ? allTrans : [english];
 
   let effectiveMode = mode;
   let options = [];
   if (mode === 3) {
-    options = buildOptions(state, item, kind, direction, answer);
+    options = buildOptions(state, item, kind, direction, acceptableAnswers);
     if (!options) effectiveMode = 2;
   }
 
@@ -162,6 +187,7 @@ export function prepareCard(state, entry, mode) {
     mode: effectiveMode,
     prompt,
     answer,
+    acceptableAnswers,
     options,
     label: kind === "word" ? item.lemma : item.text,
   };

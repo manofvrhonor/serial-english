@@ -28,6 +28,12 @@
   --warning: oklch(0.65 0.15 75);
   --warning-bg: oklch(0.96 0.04 95);
 
+  /* Прогресс-бары серий: между -bg тегов и насыщенным акцентом */
+  --prog-known: color-mix(in oklch, var(--success) 68%, white);
+  --prog-studying: color-mix(in oklch, var(--muted-foreground) 38%, var(--secondary));
+  --prog-stop: oklch(0.72 0.22 27);
+  --prog-notrans: oklch(0.80 0.17 91);
+
   --sidebar: oklch(0.984 0.003 247.858);
   --sidebar-foreground: oklch(0.129 0.042 264.695);
   --sidebar-primary: oklch(0.208 0.042 265.755);
@@ -1180,19 +1186,19 @@ textarea:focus-visible {
 }
 
 .prog-seg-known {
-  background: var(--success);
+  background: var(--prog-known);
 }
 
 .prog-seg-studying {
-  background: var(--muted-foreground);
+  background: var(--prog-studying);
 }
 
 .prog-seg-stop {
-  background: var(--destructive);
+  background: var(--prog-stop);
 }
 
 .prog-seg-notrans {
-  background: var(--warning);
+  background: var(--prog-notrans);
 }
 
 /* ===== Source vocabulary (серия / глава) & Knowledge base ===== */
@@ -1558,6 +1564,28 @@ textarea:focus-visible {
   line-height: 1.2;
   min-height: 2.25rem;
   padding: 0.375rem 0.5rem;
+}
+
+.source-vocab-filter-tabs .tab-btn-stat,
+.kb-filter-tabs .tab-btn-stat {
+  flex-direction: column;
+  gap: 0.125rem;
+  min-height: 3rem;
+  padding: 0.375rem 0.25rem;
+}
+
+.source-vocab-filter-tabs .tab-btn-stat .tab-btn-label,
+.kb-filter-tabs .tab-btn-stat .tab-btn-label {
+  font-size: 0.6875rem;
+  line-height: 1.1;
+  font-weight: 600;
+}
+
+.source-vocab-filter-tabs .tab-btn-stat .tab-btn-num,
+.kb-filter-tabs .tab-btn-stat .tab-btn-num {
+  font-size: 1.375rem;
+  line-height: 1;
+  font-weight: 700;
 }
 
 .source-vocab-filter-tabs .filter-tab-known,

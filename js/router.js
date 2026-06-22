@@ -1,16 +1,16 @@
-import { renderImport } from "./views/import.js?v=20260628";
+import { renderImport } from "./views/import.js?v=20260639";
 
-import { renderKnowledge } from "./views/knowledge.js?v=20260628";
+import { renderKnowledge } from "./views/knowledge.js?v=20260639";
 
-import { renderTraining } from "./views/training.js?v=20260628";
+import { renderTraining } from "./views/training.js?v=20260639";
 
-import { renderShows } from "./views/shows.js?v=20260628";
+import { renderShows } from "./views/shows.js?v=20260639";
 
-import { renderBooks } from "./views/books.js?v=20260628";
+import { renderBooks } from "./views/books.js?v=20260639";
 
-import { renderSettings } from "./views/settings.js?v=20260628";
+import { renderSettings } from "./views/settings.js?v=20260639";
 
-import { refreshPageScrollTop } from "./ui/scroll-top.js?v=20260628";
+import { refreshPageScrollTop } from "./ui/scroll-top.js?v=20260639";
 
 
 
