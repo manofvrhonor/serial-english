@@ -1,8 +1,8 @@
 import {
   buildSession, prepareCard, resolveMode, applyAnswer,
   countTrainingItems, directionLabel, modeLabel,
-  TRAINING_MODE_LABELS, TRAINING_MODE_HINTS, TRAINING_MODE_ORDER,
-  canUseChoiceMode,
+  TRAINING_MODE_LABELS, TRAINING_MODE_ORDER,
+  canUseChoiceMode, normalizeTrainingModes,
 } from "../core/srs.js";
 import {
   recordSessionSummary,
@@ -11,6 +11,8 @@ import {
   stepsRemaining,
 } from "../db/database.js";
 import { bindScrollTop } from "../ui/scroll-top.js";
+import { attachSwipeCard } from "../ui/swipe-card.js";
+import { openTrainEditModal } from "../ui/train-edit-modal.js?v=20260661";
 
 const STEP_SIZE = 10;
 
@@ -18,8 +20,8 @@ let session = null;
 
 const setupDefaults = {
   content: "words",
-  direction: "enru",
-  mode: "2",
+  direction: "both",
+  modes: ["2"],
   dueOnly: true,
 };
 
@@ -34,7 +36,7 @@ export function renderTraining(el, ctx) {
     startSession(el, ctx, {
       content: "all",
       direction: "both",
-      mode: "mix",
+      modes: ["1", "2", "3"],
       dueOnly: false,
       sourceId: prep.sourceId,
       prepLabel: prep.label,
@@ -46,17 +48,15 @@ export function renderTraining(el, ctx) {
 }
 
 function renderSetup(el, ctx) {
-  const due = countTrainingItems(ctx.state, {
+  const dueToday = countTrainingItems(ctx.state, {
     content: setup.content,
     direction: setup.direction,
-    dueOnly: setup.dueOnly,
+    dueOnly: true,
   });
-  const dueLabel = setup.dueOnly ? "К повторению сегодня" : "Доступно для тренировки";
   const today = getTodayTrainingSummary(ctx.state);
   const history = ctx.state.settings?.sessionHistory || [];
   const choiceOk = canUseChoiceMode(ctx.state, setup.content);
-
-  if (!choiceOk && setup.mode === "3") setup.mode = "2";
+  setup.modes = normalizeTrainingModes(setup.modes, { allowChoice: choiceOk });
 
   el.innerHTML = `
     <div class="page train-page">
@@ -69,11 +69,8 @@ function renderSetup(el, ctx) {
       </h1>
 
       <div class="card card-padded train-setup-card">
-        ${due ? `<div class="train-due-badge">${dueLabel}: <strong>${due}</strong></div>` : ""}
-
         <div class="train-field">
-          <div class="train-field-label">Что тренируем</div>
-          <div class="segment" data-segment="content">
+          <div class="segment segment-full" data-segment="content">
             <button type="button" class="segment-btn ${setup.content === "words" ? "active" : ""}" data-value="words">Слова</button>
             <button type="button" class="segment-btn ${setup.content === "phrases" ? "active" : ""}" data-value="phrases">Выражения</button>
             <button type="button" class="segment-btn ${setup.content === "all" ? "active" : ""}" data-value="all">Всё</button>
@@ -81,8 +78,7 @@ function renderSetup(el, ctx) {
         </div>
 
         <div class="train-field">
-          <div class="train-field-label">Направление</div>
-          <div class="segment" data-segment="direction">
+          <div class="segment segment-full" data-segment="direction">
             <button type="button" class="segment-btn ${setup.direction === "enru" ? "active" : ""}" data-value="enru">EN → RU</button>
             <button type="button" class="segment-btn ${setup.direction === "ruen" ? "active" : ""}" data-value="ruen">RU → EN</button>
             <button type="button" class="segment-btn ${setup.direction === "both" ? "active" : ""}" data-value="both">Оба</button>
@@ -90,24 +86,24 @@ function renderSetup(el, ctx) {
         </div>
 
         <div class="train-field">
-          <div class="train-field-label">Режим карточек</div>
-          <div class="mode-grid" data-segment="mode">
+          <div class="mode-stack">
             ${TRAINING_MODE_ORDER.map((value) => {
               const disabled = value === "3" && !choiceOk;
+              const active = setup.modes.includes(value);
               return `
-              <button type="button" class="mode-btn ${setup.mode === value ? "active" : ""}"
+              <button type="button" class="mode-btn ${active ? "active" : ""}"
                 data-value="${value}"${disabled ? " disabled" : ""}
+                aria-pressed="${active}"
                 title="${disabled ? "Нужно минимум 4 элемента с переводом" : TRAINING_MODE_LABELS[value]}">
                 ${TRAINING_MODE_LABELS[value]}
               </button>`;
             }).join("")}
           </div>
-          <p class="train-mode-hint" id="t-mode-hint">${TRAINING_MODE_HINTS[setup.mode] || ""}${!choiceOk ? " Режим «4 варианта» доступен при ≥4 элементах с переводом." : ""}</p>
         </div>
 
         <label class="train-due-row">
           <input type="checkbox" id="t-dueonly" ${setup.dueOnly ? "checked" : ""} />
-          Только к повторению сегодня
+          Только к повторению сегодня <strong>${dueToday}</strong>
         </label>
 
         <button id="t-start" class="btn btn-lg btn-block">Начать тренировку</button>
@@ -140,14 +136,25 @@ function renderSetup(el, ctx) {
     btn.addEventListener("click", () => {
       const seg = btn.closest(".segment").dataset.segment;
       setup[seg] = btn.dataset.value;
-      if (!canUseChoiceMode(ctx.state, setup.content) && setup.mode === "3") setup.mode = "2";
+      setup.modes = normalizeTrainingModes(setup.modes, {
+        allowChoice: canUseChoiceMode(ctx.state, setup.content),
+      });
       renderSetup(el, ctx);
     });
   });
 
   el.querySelectorAll(".mode-btn").forEach((btn) => {
     btn.addEventListener("click", () => {
-      setup.mode = btn.dataset.value;
+      const value = btn.dataset.value;
+      if (btn.disabled) return;
+      const idx = setup.modes.indexOf(value);
+      if (idx >= 0) {
+        if (setup.modes.length === 1) return;
+        setup.modes.splice(idx, 1);
+      } else {
+        setup.modes.push(value);
+        setup.modes.sort();
+      }
       renderSetup(el, ctx);
     });
   });
@@ -161,7 +168,7 @@ function renderSetup(el, ctx) {
     startSession(el, ctx, {
       content: setup.content,
       direction: setup.direction,
-      mode: setup.mode,
+      modes: setup.modes,
       dueOnly: setup.dueOnly,
     });
   });
@@ -218,15 +225,104 @@ function currentEntry() {
   return session.entries[session.index];
 }
 
+function canAnswerCard(mode, revealed, answered) {
+  if (answered) return false;
+  if (mode === 3) return false;
+  if (mode === 2 && !revealed) return false;
+  return true;
+}
+
+function renderSwipeCard(innerHtml, { swipeable, promptOnly = false } = {}) {
+  const cardCls = [
+    "swipe-card", "train-card", "card", "card-padded",
+    promptOnly ? "train-card-prompt" : "",
+    swipeable ? "" : "train-card-static",
+  ].filter(Boolean).join(" ");
+
+  return `
+    <div class="swipe-stage train-swipe-stage">
+      <div class="${cardCls}" id="train-swipe">
+        ${swipeable ? `
+        <div class="swipe-hint swipe-hint-left" hidden>НЕ ЗНАЮ</div>
+        <div class="swipe-hint swipe-hint-right" hidden>ЗНАЮ</div>` : ""}
+        <div class="swipe-card-inner train-card-inner">${innerHtml}</div>
+      </div>
+    </div>`;
+}
+
+function exciseItemFromSession(el, ctx, itemId, kind) {
+  if (!session) return;
+  const match = (e) => e.item.id === itemId && e.kind === kind;
+  const wasCurrent = match(session.entries[session.index]);
+
+  session.queue = session.queue.filter((e) => !match(e));
+  session.totalSteps = stepsInQueue(session.queue.length, STEP_SIZE);
+
+  let removedBefore = 0;
+  session.entries = session.entries.filter((e, i) => {
+    if (!match(e)) return true;
+    if (i < session.index) removedBefore++;
+    return false;
+  });
+  if (!wasCurrent) session.index -= removedBefore;
+
+  if (session.queue.length === 0) {
+    renderSessionComplete(el, ctx);
+    return;
+  }
+  if (session.entries.length === 0) {
+    if (hasNextStep()) startNextStep(el, ctx);
+    else renderStepDone(el, ctx);
+    return;
+  }
+  if (wasCurrent && session.index >= session.entries.length) {
+    if (hasNextStep()) startNextStep(el, ctx);
+    else renderStepDone(el, ctx);
+    return;
+  }
+  renderCard(el, ctx);
+}
+
+function attachTrainSwipe(el, ctx) {
+  if (session.swipeDetach) {
+    session.swipeDetach();
+    session.swipeDetach = null;
+  }
+  const { mode } = session.current;
+  if (!canAnswerCard(mode, session.revealed, session.answered)) return;
+
+  const swipeEl = el.querySelector("#train-swipe");
+  if (!swipeEl) return;
+
+  session.swipeDetach = attachSwipeCard(swipeEl, {
+    onLeft: () => {
+      if (session.answered) return;
+      finishCard(el, ctx, false);
+    },
+    onRight: () => {
+      if (session.answered) return;
+      finishCard(el, ctx, true);
+    },
+  });
+}
+
 function renderCard(el, ctx) {
+  if (session.swipeDetach) {
+    session.swipeDetach();
+    session.swipeDetach = null;
+  }
+
   const entry = currentEntry();
-  const requestedMode = resolveMode(session.opts.mode);
+  const requestedMode = resolveMode(session.opts.modes ?? session.opts.mode);
   const card = prepareCard(ctx.state, entry, requestedMode);
   const mode = card.mode;
 
+  const sameCard = session.current?.entry?.item?.id === entry.item.id
+    && session.current?.entry?.direction === entry.direction
+    && session.current?.entry?.kind === entry.kind;
   session.current = { entry, mode, card };
-  session.revealed = mode === 1;
-  session.answered = false;
+  session.revealed = mode === 1 || (mode === 2 && sameCard && session.revealed);
+  session.answered = sameCard ? session.answered : false;
 
   const progress = `${session.index + 1} / ${session.entries.length}`;
   const dir = directionLabel(entry.direction);
@@ -234,36 +330,49 @@ function renderCard(el, ctx) {
     ? `<p class="train-prep-line">${esc(session.prepLabel)}</p>` : "";
 
   const isChoice = mode === 3;
-  const cardClass = isChoice
-    ? "train-card train-card-prompt card card-padded"
-    : `train-card card card-padded${mode === 2 && !session.revealed ? " train-card-clickable" : ""}`;
+  const swipeable = canAnswerCard(mode, session.revealed, session.answered);
+  const cardInner = isChoice ? renderPromptOnly(card) : renderCardBody(card, mode, session.revealed);
+  const editLabel = entry.kind === "word" ? "исправить слово" : "исправить выражение";
 
   el.innerHTML = `
     <div class="page train-page train-session">
     ${renderSessionHeader(mode, progress, dir)}
     ${prepLine}
 
-    <div class="${cardClass}" id="train-card">
-      ${isChoice ? renderPromptOnly(card) : renderCardBody(card, mode, session.revealed)}
-    </div>
+    ${renderSwipeCard(cardInner, { swipeable, promptOnly: isChoice })}
 
     ${isChoice ? renderOptionsBlock(card, false) : ""}
 
     <div id="train-actions" class="train-actions ${isChoice && session.answered ? "train-actions-single" : ""}">
       ${renderActions(card, mode, session.revealed, session.answered)}
     </div>
+
+    <button type="button" id="t-edit-item" class="btn secondary btn-block train-edit-btn">${editLabel}</button>
     </div>
   `;
 
   el.querySelector("#t-quit").addEventListener("click", () => renderSetup(el, ctx));
 
   if (mode === 2 && !session.revealed) {
-    el.querySelector("#train-card")?.addEventListener("click", (e) => {
+    el.querySelector(".train-card-inner")?.addEventListener("click", (e) => {
       if (e.target.closest("#t-reveal")) return;
       revealCard(el, ctx);
     });
   }
 
+  el.querySelector("#t-edit-item")?.addEventListener("click", () => {
+    openTrainEditModal(ctx, {
+      kind: entry.kind,
+      itemId: entry.item.id,
+      onRemoved: () => exciseItemFromSession(el, ctx, entry.item.id, entry.kind),
+      onClose: () => {
+        if (session.answered) return;
+        renderCard(el, ctx);
+      },
+    });
+  });
+
+  attachTrainSwipe(el, ctx);
   bindCardEvents(el, ctx);
 }
 
@@ -286,9 +395,10 @@ function renderSessionHeader(mode, progress, dir) {
 function revealCard(el, ctx) {
   const { mode, card } = session.current;
   session.revealed = true;
-  el.querySelector("#train-card").innerHTML = renderCardBody(card, mode, true);
+  el.querySelector(".train-card-inner").innerHTML = renderCardBody(card, mode, true);
   el.querySelector("#train-actions").innerHTML = renderActions(card, mode, true, false);
   el.querySelector("#train-actions").className = "train-actions";
+  attachTrainSwipe(el, ctx);
   bindCardEvents(el, ctx);
 }
 
@@ -353,8 +463,8 @@ function renderActions(card, mode, revealed, answered) {
     return `<p class="train-hint btn-block-row">Нажмите на карточку или «Показать»</p>`;
   }
   return `
-    <button type="button" id="t-unknown" class="btn btn-danger train-action-btn" aria-label="Не знал">${ICON_X}Не знал</button>
-    <button type="button" id="t-knew" class="btn train-knew train-action-btn" aria-label="Знал">${ICON_CHECK}Знал</button>`;
+    <button type="button" id="t-unknown" class="btn btn-danger train-action-btn" aria-label="Не знаю">${ICON_X}Не знаю</button>
+    <button type="button" id="t-knew" class="btn train-knew train-action-btn" aria-label="Знаю">${ICON_CHECK}Знаю</button>`;
 }
 
 function bindCardEvents(el, ctx) {

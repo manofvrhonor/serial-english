@@ -8,6 +8,7 @@ import {
   isStopWord,
   addWords,
   addPhrases,
+  addSourceToItem,
 } from "../db/database.js";
 import { translate } from "../import/dictionary.js";
 import { translatePhrase } from "../import/phrases.js";
@@ -118,7 +119,13 @@ export function ensureSnapshotItems(state, sourceId, dict, phrasesDb) {
 
   for (const lemma of words) {
     const l = String(lemma).toLowerCase().trim();
-    if (!l || isKnownLemma(state, l) || isStopWord(state, l) || findWordByLemma(state, l)) continue;
+    if (!l || isKnownLemma(state, l) || isStopWord(state, l)) continue;
+    const existing = findWordByLemma(state, l);
+    if (existing) {
+      addSourceToItem(existing, sourceId);
+      changed = true;
+      continue;
+    }
     const translations = dict ? translate(lemma, dict).filter(Boolean) : [];
     addWords(state, [{ lemma: String(lemma).trim(), translations }], sourceId);
     changed = true;
@@ -126,7 +133,13 @@ export function ensureSnapshotItems(state, sourceId, dict, phrasesDb) {
 
   for (const text of phrases) {
     const t = String(text).toLowerCase().trim();
-    if (!t || isKnownPhrase(state, t) || findPhraseByText(state, t)) continue;
+    if (!t || isKnownPhrase(state, t)) continue;
+    const existing = findPhraseByText(state, t);
+    if (existing) {
+      addSourceToItem(existing, sourceId);
+      changed = true;
+      continue;
+    }
     const translations = phrasesDb ? translatePhrase(text, phrasesDb).filter(Boolean) : [];
     addPhrases(state, [{ text: String(text).trim(), translations }], sourceId);
     changed = true;

@@ -4,7 +4,7 @@ import {
   markWordLearned,
 } from "../db/database.js";
 import { transChipsHtml, bindTransChipsContainers } from "../ui/trans-chips.js?v=20260621";
-import { openSourcesModal } from "../ui/sources-modal.js?v=20260621";
+import { openSourcesModal } from "../ui/sources-modal.js?v=20260657";
 import { btnLearned, btnStopList, btnSources } from "../ui/action-icons.js";
 
 import { bindScrollTop } from "../ui/scroll-top.js";

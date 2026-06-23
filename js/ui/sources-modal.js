@@ -1,4 +1,4 @@
-import { formatSourceShort } from "../db/database.js";
+import { formatSourcesGrouped } from "../db/database.js";
 
 let modalReady = false;
 
@@ -31,7 +31,7 @@ function ensureModal() {
 export function openSourcesModal(state, sourceIds, itemLabel = "", { manual = false } = {}) {
   const modal = ensureModal();
   const ids = (sourceIds || []).filter(Boolean);
-  const labels = ids.map((id) => formatSourceShort(state, id)).filter(Boolean);
+  const labels = formatSourcesGrouped(state, ids);
 
   modal.querySelector("#sources-modal-title").textContent = itemLabel
     ? `Источники — ${itemLabel}`

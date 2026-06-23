@@ -21,8 +21,8 @@ import { getPhrases, translatePhrase } from "../import/phrases.js";
 import { transChipsHtml, bindTransChipsContainers } from "../ui/trans-chips.js?v=20260621";
 import { btnReturnStudy, btnStopList, btnDeleteWord, btnRemove } from "../ui/action-icons.js";
 import { countTrainingItems } from "../core/srs.js";
-import { mountWordsPanel } from "./study-words.js?v=20260621";
-import { mountPhrasesPanel } from "./study-phrases.js?v=20260621";
+import { mountWordsPanel } from "./study-words.js?v=20260657";
+import { mountPhrasesPanel } from "./study-phrases.js?v=20260657";
 import { bindScrollTop } from "../ui/scroll-top.js";
 
 const KB_FILTERS = [

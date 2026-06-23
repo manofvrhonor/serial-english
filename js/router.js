@@ -1,18 +1,18 @@
-import { renderImport } from "./views/import.js?v=20260655";
+import { renderImport } from "./views/import.js?v=20260661";
 
-import { renderKnowledge } from "./views/knowledge.js?v=20260655";
+import { renderKnowledge } from "./views/knowledge.js?v=20260661";
 
-import { renderTraining } from "./views/training.js?v=20260655";
+import { renderTraining } from "./views/training.js?v=20260661";
 
-import { renderShows } from "./views/shows.js?v=20260655";
+import { renderShows } from "./views/shows.js?v=20260661";
 
-import { renderBooks } from "./views/books.js?v=20260655";
+import { renderBooks } from "./views/books.js?v=20260661";
 
-import { renderSettings } from "./views/settings.js?v=20260655";
+import { renderSettings } from "./views/settings.js?v=20260661";
 
-import { renderAdminLibrary } from "./views/admin-library.js?v=20260655";
+import { renderAdminLibrary } from "./views/admin-library.js?v=20260661";
 
-import { refreshPageScrollTop } from "./ui/scroll-top.js?v=20260655";
+import { refreshPageScrollTop } from "./ui/scroll-top.js?v=20260661";
 
 import { isAdminMode } from "./core/admin-gate.js";
 

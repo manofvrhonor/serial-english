@@ -11,6 +11,7 @@ import {
   isStopWord,
   addWords,
   addPhrases,
+  addSourceToItem,
   setSourceVocabulary,
 } from "../db/database.js";
 import { translate } from "./dictionary.js";
@@ -218,7 +219,13 @@ export function importLibraryEpisodes(state, show, selections, { dict = null, ph
     const wordItems = [];
     for (const lemma of libEp.words || []) {
       const l = normLemma(lemma);
-      if (!l || isKnownLemma(state, l) || isStopWord(state, l) || findWordByLemma(state, l)) continue;
+      if (!l || isKnownLemma(state, l) || isStopWord(state, l)) continue;
+      const existing = findWordByLemma(state, l);
+      if (existing) {
+        addSourceToItem(existing, sourceId);
+        result.words.updated++;
+        continue;
+      }
       wordItems.push({
         lemma: String(lemma).trim(),
         translations: resolveWordTranslations(show, lemma, dict),
@@ -233,7 +240,13 @@ export function importLibraryEpisodes(state, show, selections, { dict = null, ph
     const phraseItems = [];
     for (const text of libEp.phrases || []) {
       const t = normPhrase(text);
-      if (!t || isKnownPhrase(state, t) || findPhraseByText(state, t)) continue;
+      if (!t || isKnownPhrase(state, t)) continue;
+      const existing = findPhraseByText(state, t);
+      if (existing) {
+        addSourceToItem(existing, sourceId);
+        result.phrases.updated++;
+        continue;
+      }
       phraseItems.push({
         text: String(text).trim(),
         translations: resolvePhraseTranslations(show, text, phrasesDb),

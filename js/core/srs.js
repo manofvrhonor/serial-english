@@ -224,9 +224,25 @@ export function buildSession(state, opts) {
   return shuffleAvoidingAdjacent(entries);
 }
 
-export function resolveMode(sessionMode) {
-  if (sessionMode === "mix") return 1 + Math.floor(Math.random() * 3);
-  return Number(sessionMode) || 1;
+export function resolveMode(sessionModes, { allowChoice = true } = {}) {
+  const modes = normalizeTrainingModes(sessionModes, { allowChoice });
+  const pick = modes[Math.floor(Math.random() * modes.length)];
+  return Number(pick) || 1;
+}
+
+/** Нормализует выбранные режимы: массив "1"|"2"|"3", минимум один. Legacy: "mix" → все три. */
+export function normalizeTrainingModes(input, { allowChoice = true } = {}) {
+  let modes;
+  if (Array.isArray(input)) {
+    modes = input.map(String).filter((m) => TRAINING_MODE_ORDER.includes(m));
+  } else if (input === "mix" || input == null) {
+    modes = [...TRAINING_MODE_ORDER];
+  } else {
+    const s = String(input);
+    modes = TRAINING_MODE_ORDER.includes(s) ? [s] : ["2"];
+  }
+  if (!allowChoice) modes = modes.filter((m) => m !== "3");
+  return modes.length ? modes : ["2"];
 }
 
 export function applyAnswer(state, entry, mode, correct) {
@@ -306,17 +322,15 @@ export const TRAINING_MODE_LABELS = {
   1: "Слово + перевод",
   2: "Перевод по клику",
   3: "4 варианта",
-  mix: "Смешанный",
 };
 
 export const TRAINING_MODE_HINTS = {
   1: "Слово и перевод сразу. Отметьте «Знал» или «Не знал».",
   2: "Покажется слово — нажмите, чтобы открыть перевод.",
   3: "Слово и 4 варианта — выберите правильный.",
-  mix: "Каждая карточка случайно в одном из трёх режимов.",
 };
 
-export const TRAINING_MODE_ORDER = ["1", "2", "3", "mix"];
+export const TRAINING_MODE_ORDER = ["1", "2", "3"];
 
 export function directionLabel(dir) {
   return dir === "enru" ? "EN→RU" : "RU→EN";

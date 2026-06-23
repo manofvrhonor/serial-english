@@ -171,6 +171,9 @@ export async function loadState() {
   if (repairKnowledgeWordCards(normalized)) {
     needsSave = true;
   }
+  if (repairSourcesFromVocabulary(normalized)) {
+    needsSave = true;
+  }
   if (needsSave) {
     await saveState(normalized);
   }
@@ -680,14 +683,30 @@ export function resolveSourceLabel(state, sourceId) {
 
 /** Краткая метка для списка источников: «Сериал · S01E01» / «Книга · гл.3» */
 export function formatSourceShort(state, sourceId) {
-  if (!sourceId) return null;
+  const meta = resolveSourceMeta(state, sourceId);
+  if (meta.kind === "episode") {
+    const code = `S${pad2(meta.season)}E${pad2(meta.episode)}`;
+    return `${meta.showTitle} · ${code}`;
+  }
+  if (meta.kind === "chapter") {
+    return `${meta.bookTitle} · гл.${meta.chapter}`;
+  }
+  return meta.label || sourceId;
+}
+
+function resolveSourceMeta(state, sourceId) {
+  if (!sourceId) return { kind: "unknown", label: null };
 
   for (const show of state.shows || []) {
     for (const season of show.seasons || []) {
       for (const ep of season.episodes || []) {
         if (ep.id === sourceId) {
-          const code = `S${String(season.number).padStart(2, "0")}E${String(ep.number).padStart(2, "0")}`;
-          return `${show.title} · ${code}`;
+          return {
+            kind: "episode",
+            showTitle: show.title,
+            season: season.number,
+            episode: ep.number,
+          };
         }
       }
     }
@@ -696,12 +715,84 @@ export function formatSourceShort(state, sourceId) {
   for (const book of state.books || []) {
     for (const ch of book.chapters || []) {
       if (ch.id === sourceId) {
-        return `${book.title} · гл.${ch.number}`;
+        return {
+          kind: "chapter",
+          bookTitle: book.title,
+          chapter: ch.number,
+        };
       }
     }
   }
 
-  return sourceId;
+  return { kind: "unknown", label: sourceId };
+}
+
+function pad2(n) {
+  return String(Number(n) || 0).padStart(2, "0");
+}
+
+/** Сжимает номера в диапазоны: [1,2,3,7] → "01-03, 07" */
+function formatNumberRanges(nums) {
+  const sorted = [...new Set(nums.map((n) => Number(n)).filter((n) => n > 0))].sort((a, b) => a - b);
+  if (!sorted.length) return "";
+
+  const parts = [];
+  for (let i = 0; i < sorted.length;) {
+    const start = sorted[i];
+    let end = start;
+    while (i + 1 < sorted.length && sorted[i + 1] === end + 1) {
+      i++;
+      end = sorted[i];
+    }
+    parts.push(start === end ? pad2(start) : `${pad2(start)}-${pad2(end)}`);
+    i++;
+  }
+  return parts.join(", ");
+}
+
+/** Группированный список источников для модалки: «Сериал - S01 - 01-07». */
+export function formatSourcesGrouped(state, sourceIds) {
+  const episodeGroups = new Map();
+  const chapterGroups = new Map();
+  const fallback = [];
+
+  for (const sourceId of (sourceIds || []).filter(Boolean)) {
+    const meta = resolveSourceMeta(state, sourceId);
+    if (meta.kind === "episode") {
+      const key = `${meta.showTitle}\0${meta.season}`;
+      if (!episodeGroups.has(key)) {
+        episodeGroups.set(key, { showTitle: meta.showTitle, season: meta.season, episodes: [] });
+      }
+      episodeGroups.get(key).episodes.push(meta.episode);
+      continue;
+    }
+    if (meta.kind === "chapter") {
+      const key = meta.bookTitle;
+      if (!chapterGroups.has(key)) {
+        chapterGroups.set(key, { bookTitle: meta.bookTitle, chapters: [] });
+      }
+      chapterGroups.get(key).chapters.push(meta.chapter);
+      continue;
+    }
+    fallback.push(meta.label || sourceId);
+  }
+
+  const labels = [];
+
+  for (const { showTitle, season, episodes } of [...episodeGroups.values()].sort((a, b) => {
+    const byTitle = a.showTitle.localeCompare(b.showTitle);
+    return byTitle || a.season - b.season;
+  })) {
+    labels.push(`${showTitle} - S${pad2(season)} - ${formatNumberRanges(episodes)}`);
+  }
+
+  for (const { bookTitle, chapters } of [...chapterGroups.values()].sort((a, b) => (
+    a.bookTitle.localeCompare(b.bookTitle)
+  ))) {
+    labels.push(`${bookTitle} - ${formatNumberRanges(chapters)}`);
+  }
+
+  return [...labels, ...fallback];
 }
 
 // ===================================================================
@@ -1198,6 +1289,41 @@ export function addKnownPhraseFromImport(state, { text, translations = [], sourc
     state.phrases.push(phrase);
   }
   return phrase;
+}
+
+/** Дополняет sources у карточек по снимкам лексики эпизодов/глав (без дублей). */
+function repairSourcesFromVocabulary(state) {
+  let changed = false;
+
+  const attach = (items, sourceId, findFn) => {
+    for (const key of items || []) {
+      const item = findFn(state, key);
+      if (!item) continue;
+      const before = item.sources?.length || 0;
+      addSourceToItem(item, sourceId);
+      if ((item.sources?.length || 0) > before) changed = true;
+    }
+  };
+
+  for (const show of state.shows || []) {
+    for (const season of show.seasons || []) {
+      for (const ep of season.episodes || []) {
+        if (!ep?.id || !ep.vocabulary) continue;
+        attach(ep.vocabulary.words, ep.id, findWordByLemma);
+        attach(ep.vocabulary.phrases, ep.id, findPhraseByText);
+      }
+    }
+  }
+
+  for (const book of state.books || []) {
+    for (const ch of book.chapters || []) {
+      if (!ch?.id || !ch.vocabulary) continue;
+      attach(ch.vocabulary.words, ch.id, findWordByLemma);
+      attach(ch.vocabulary.phrases, ch.id, findPhraseByText);
+    }
+  }
+
+  return changed;
 }
 
 function repairKnowledgeWordCards(state) {
