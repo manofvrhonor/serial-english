@@ -266,11 +266,11 @@ button, input, select, textarea { font: inherit; }
   z-index: 40;
   display: flex;
   justify-content: space-around;
-  background: var(--background);
-  background: color-mix(in oklch, var(--background) 95%, transparent);
-  backdrop-filter: blur(8px);
+  gap: 0.25rem;
+  background: var(--muted);
   border-top: 1px solid var(--border);
-  padding-bottom: env(safe-area-inset-bottom, 0);
+  padding: 0.375rem;
+  padding-bottom: calc(0.375rem + env(safe-area-inset-bottom, 0));
 }
 
 @media (min-width: 768px) {
@@ -286,12 +286,13 @@ button, input, select, textarea { font: inherit; }
   gap: 0.125rem;
   padding: 0.5rem 0.125rem;
   border: none;
+  border-radius: var(--radius-md);
   background: transparent;
-  color: var(--muted-foreground);
+  color: var(--primary);
   font-size: 0.625rem;
   line-height: 1.2;
   cursor: pointer;
-  transition: color 0.15s;
+  transition: background 0.15s, color 0.15s;
 }
 
 .mobile-nav-item span {
@@ -302,7 +303,11 @@ button, input, select, textarea { font: inherit; }
 }
 
 .mobile-nav-item .nav-icon { width: 1.125rem; height: 1.125rem; }
-.mobile-nav-item.active { color: var(--primary); }
+.mobile-nav-item.active {
+  color: var(--primary);
+  background: var(--background);
+  box-shadow: 0 1px 2px oklch(0 0 0 / 8%);
+}
 
 /* ===== Buttons ===== */
 .btn {
