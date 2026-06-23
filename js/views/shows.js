@@ -34,6 +34,38 @@ function collectEpisodeIds(state) {
   return ids;
 }
 
+export async function mountShowsContent(mountEl, ctx) {
+  await materializeSnapshots(ctx, collectEpisodeIds(ctx.state));
+
+  const shows = ctx.state.shows || [];
+
+  if (!shows.length) {
+    mountEl.innerHTML = `
+      <div class="card card-padded list-empty">
+        Пока нет сериалов. Загрузите файл <b>.srt</b> выше —
+        сериал, сезон и серия создадутся автоматически.
+      </div>`;
+    return;
+  }
+
+  const cards = shows.map((show) => renderShowCard(ctx, show)).join("");
+
+  mountEl.innerHTML = `<div class="source-cards">${cards}</div>`;
+
+  mountEl.querySelectorAll(".tree-prep-btn").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      if (btn.disabled) return;
+      ctx.startPrepTraining?.(btn.dataset.source, btn.dataset.label);
+    });
+  });
+
+  mountEl.querySelectorAll(".source-vocab-btn").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      ctx.openSourceVocab?.(btn.dataset.source, btn.dataset.label, "shows");
+    });
+  });
+}
+
 export async function renderShows(el, ctx) {
   if (ctx.sourceVocab?.backRoute === "shows") {
     await materializeSnapshots(ctx, [ctx.sourceVocab.sourceId]);
@@ -41,43 +73,12 @@ export async function renderShows(el, ctx) {
     return;
   }
 
-  await materializeSnapshots(ctx, collectEpisodeIds(ctx.state));
-
-  const shows = ctx.state.shows || [];
-
-  if (!shows.length) {
-    el.innerHTML = `
-      <div class="page">
-      <h1 class="view-title view-title-section">Сериалы</h1>
-      <p class="view-subtitle">Вложенность: Сериал → Сезон → Серия.</p>
-      <div class="card card-padded list-empty">
-        Пока нет сериалов. Импортируйте файл <b>.srt</b> в разделе «Импорт» —
-        сериал, сезон и серия создадутся автоматически.
-      </div>
-      </div>`;
-    return;
-  }
-
-  const cards = shows.map((show) => renderShowCard(ctx, show)).join("");
-
   el.innerHTML = `
     <div class="page">
-    <h1 class="view-title view-title-section">Сериалы</h1>
-    <div class="source-cards">${cards}</div>
+      <h1 class="view-title view-title-section">Сериалы</h1>
+      <div id="shows-mount"></div>
     </div>`;
-
-  el.querySelectorAll(".tree-prep-btn").forEach((btn) => {
-    btn.addEventListener("click", () => {
-      if (btn.disabled) return;
-      ctx.startPrepTraining?.(btn.dataset.source, btn.dataset.label);
-    });
-  });
-
-  el.querySelectorAll(".source-vocab-btn").forEach((btn) => {
-    btn.addEventListener("click", () => {
-      ctx.openSourceVocab?.(btn.dataset.source, btn.dataset.label, "shows");
-    });
-  });
+  await mountShowsContent(el.querySelector("#shows-mount"), ctx);
 }
 
 function renderShowCard(ctx, show) {

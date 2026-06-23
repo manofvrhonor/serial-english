@@ -101,7 +101,7 @@ function draw(el, ctx) {
 
   el.innerHTML = `
     <div class="page kb-page">
-      <h1 class="view-title view-title-section kb-title">База знаний</h1>
+      <h1 class="view-title view-title-section kb-title">Словарь</h1>
 
       ${toolbarHtml(ctx)}
 

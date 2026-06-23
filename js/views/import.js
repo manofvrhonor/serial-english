@@ -33,22 +33,20 @@ const defaultUi = () => ({
   phrasesPhase: "withTrans",
 });
 
-export function renderImport(el, ctx) {
+export function mountImportSection(el, ctx) {
+  if (!el) return;
   session = null;
   swipeDetach = null;
 
   el.innerHTML = `
-    <div class="page import-page">
-      <h1 class="view-title view-title-section">Импорт текста</h1>
-
-      <div class="card card-padded">
+      <div class="import-upload-card">
         <div class="import-upload">
           <label class="import-filelabel">
             <input type="file" id="import-file" accept=".srt,.txt" hidden />
             <span class="import-filebtn btn btn-lg">Загрузить новый файл</span>
           </label>
           <button type="button" class="btn btn-lg outline" id="import-library-btn">Выбрать из библиотеки</button>
-          <span id="import-filename" class="import-filename">srt или txt</span>
+          <span id="import-filename" class="import-filename" hidden></span>
         </div>
         <div id="import-meta" class="import-meta" hidden></div>
       </div>
@@ -56,7 +54,6 @@ export function renderImport(el, ctx) {
       <div id="import-library" class="import-library" hidden></div>
 
       <div id="import-result" class="import-result" hidden></div>
-    </div>
   `;
 
   const resultBox = el.querySelector("#import-result");
@@ -74,10 +71,20 @@ export function renderImport(el, ctx) {
     ?.addEventListener("click", () => openLibraryPicker(el, ctx));
 }
 
+/** @deprecated используйте mountImportSection через catalog.js */
+export function renderImport(el, ctx) {
+  el.innerHTML = `<div class="page import-page"><div id="catalog-import"></div></div>`;
+  mountImportSection(el.querySelector("#catalog-import"), ctx);
+}
+
 async function handleFile(el, ctx, file) {
   if (!file) return;
   el.querySelector("#import-result").hidden = true;
-  el.querySelector("#import-filename").textContent = file.name;
+  const filenameEl = el.querySelector("#import-filename");
+  if (filenameEl) {
+    filenameEl.textContent = file.name;
+    filenameEl.hidden = false;
+  }
 
   const ext = (file.name.match(/\.([^.]+)$/)?.[1] || "").toLowerCase();
   if (ext !== "srt" && ext !== "txt") {
@@ -305,11 +312,75 @@ function bulkBarHtml(kind) {
     </div>`;
 }
 
+function importActionsHtml(kind) {
+  const visible = kind === "word" ? displayWords() : displayPhrases();
+  if (!visible.length) return "";
+
+  const selected = visible.filter((item) => item.included).length;
+  const removeBtnId = kind === "word" ? "import-bulk-remove-words" : "import-bulk-remove-phrases";
+  const stopLabel = kind === "word" ? "Убрать выбранные в стоп-лист" : "Убрать выбранные";
+
+  return `
+    <div class="import-actions">
+      <button type="button" id="btn-commit" class="btn import-action-btn">Добавить выбранные в словарь</button>
+      <button type="button" class="btn outline import-action-btn" id="${removeBtnId}" ${selected ? "" : "disabled"}>
+        ${stopLabel}
+      </button>
+    </div>`;
+}
+
+function bindImportActions(el, ctx) {
+  el.querySelector("#import-bulk-remove-words")?.addEventListener("click", () => {
+    handleBulkRemove(el, ctx, "word");
+  });
+  el.querySelector("#import-bulk-remove-phrases")?.addEventListener("click", () => {
+    handleBulkRemove(el, ctx, "phrase");
+  });
+}
+
 function updateSelectedCount(el, kind) {
   const visible = kind === "word" ? displayWords() : displayPhrases();
   const selected = visible.filter((item) => item.included).length;
   const span = el.querySelector("#import-selected-count");
   if (span) span.textContent = `Выбрано: ${selected}`;
+  const btnId = kind === "word" ? "import-bulk-remove-words" : "import-bulk-remove-phrases";
+  const btn = el.querySelector(`#${btnId}`);
+  if (btn) btn.disabled = !selected;
+}
+
+function handleBulkRemove(el, ctx, kind) {
+  const visible = kind === "word" ? displayWords() : displayPhrases();
+  const selected = visible.filter((item) => item.included && !item.removed);
+  if (!selected.length) {
+    alert("Не выбрано ни одного элемента.");
+    return;
+  }
+
+  if (kind === "word") {
+    for (const item of selected) {
+      addStopWord(ctx.state, item.lemma, resolveTranslations(item));
+      item.removed = true;
+      item.included = false;
+    }
+  } else {
+    for (const item of selected) {
+      item.removed = true;
+      item.included = false;
+    }
+  }
+  ctx.save();
+
+  if (kind === "word" && maybeAdvanceWordsPhase(el, ctx)) return;
+  if (kind === "phrase" && maybeAdvancePhrasesPhase(el, ctx)) return;
+  if (importSessionComplete()) {
+    renderCommitted(el, ctx, {
+      wordRes: { added: session.totals.wordAdded, updated: session.totals.wordUpdated },
+      phraseRes: { added: session.totals.phraseAdded, updated: session.totals.phraseUpdated },
+      label: session.totals.label,
+    });
+    return;
+  }
+  renderResult(el, ctx);
 }
 
 function renderResult(el, ctx) {
@@ -328,15 +399,10 @@ function renderResult(el, ctx) {
   box.hidden = false;
   const wc = importTabWordCount();
   const pc = importTabPhraseCount();
-  const hasVisible = displayWords().length > 0 || displayPhrases().length > 0;
   const { tab, view } = session.ui;
 
   box.innerHTML = `
     <div class="card card-padded import-section-gap">
-      ${hasVisible ? `
-      <div class="import-commit-row">
-        <button type="button" id="btn-commit" class="btn">Добавить выбранные в словарь</button>
-      </div>` : ""}
       <div class="import-toolbar">
         <div class="tabs import-kind-tabs" role="tablist">
           <button type="button" class="tab-btn ${tab === "words" ? "active" : ""}" data-tab="words">Слова (${wc})</button>
@@ -492,11 +558,13 @@ function renderPanel(el, ctx) {
     return;
   }
 
-  panel.innerHTML = `${stats}${
+  panel.innerHTML = `${stats}${importActionsHtml(isPhrases ? "phrase" : "word")}${
     session.ui.view === "cards"
       ? (isPhrases ? renderPhraseCards(el, ctx) : renderWordCards(el, ctx))
       : (isPhrases ? renderPhraseList(el) : renderWordList(el))
   }`;
+
+  bindImportActions(el, ctx);
 
   if (session.ui.view === "cards") {
     if (isPhrases) bindPhraseCards(el, ctx);
@@ -1055,7 +1123,10 @@ function commit(el, ctx) {
 
 function resetImportFileForm(el) {
   const filename = el.querySelector("#import-filename");
-  if (filename) filename.textContent = "srt или txt";
+  if (filename) {
+    filename.textContent = "";
+    filename.hidden = true;
+  }
   const meta = el.querySelector("#import-meta");
   if (meta) {
     meta.hidden = true;

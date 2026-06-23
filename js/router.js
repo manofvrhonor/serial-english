@@ -1,18 +1,14 @@
-import { renderImport } from "./views/import.js?v=20260661";
+import { renderCatalog } from "./views/catalog.js?v=20260669";
 
-import { renderKnowledge } from "./views/knowledge.js?v=20260661";
+import { renderKnowledge } from "./views/knowledge.js?v=20260666";
 
-import { renderTraining } from "./views/training.js?v=20260661";
+import { renderTraining } from "./views/training.js?v=20260666";
 
-import { renderShows } from "./views/shows.js?v=20260661";
+import { renderSettings } from "./views/settings.js?v=20260666";
 
-import { renderBooks } from "./views/books.js?v=20260661";
+import { renderAdminLibrary } from "./views/admin-library.js?v=20260666";
 
-import { renderSettings } from "./views/settings.js?v=20260661";
-
-import { renderAdminLibrary } from "./views/admin-library.js?v=20260661";
-
-import { refreshPageScrollTop } from "./ui/scroll-top.js?v=20260661";
+import { refreshPageScrollTop } from "./ui/scroll-top.js?v=20260666";
 
 import { isAdminMode } from "./core/admin-gate.js";
 
@@ -20,15 +16,15 @@ import { isAdminMode } from "./core/admin-gate.js";
 
 const routes = {
 
-  import: renderImport,
+  import: renderCatalog,
+
+  shows: (el, ctx) => renderCatalog(el, ctx, { catalogTab: "shows" }),
+
+  books: (el, ctx) => renderCatalog(el, ctx, { catalogTab: "books" }),
 
   knowledge: renderKnowledge,
 
   training: renderTraining,
-
-  shows: renderShows,
-
-  books: renderBooks,
 
   settings: renderSettings,
 
@@ -52,6 +48,7 @@ function setActiveNav(route) {
 
   const navRoute = route === "words" || route === "phrases" ? "knowledge"
     : route === "library-admin" ? "settings"
+    : route === "shows" || route === "books" ? "import"
     : route;
 
 
@@ -90,8 +87,17 @@ export function navigateTo(route, options = {}) {
 
   if (options.sourceVocab) {
     appCtx.sourceVocab = options.sourceVocab;
-  } else if (route === "shows" || route === "books") {
+    appCtx.catalogTab = options.sourceVocab.backRoute === "books" ? "books" : "shows";
+  } else if (route === "import" || route === "shows" || route === "books") {
     appCtx.sourceVocab = null;
+  }
+
+  if (options.catalogTab) {
+    appCtx.catalogTab = options.catalogTab;
+  } else if (route === "shows") {
+    appCtx.catalogTab = "shows";
+  } else if (route === "books") {
+    appCtx.catalogTab = "books";
   }
 
 
@@ -102,7 +108,7 @@ export function navigateTo(route, options = {}) {
 
     setActiveNav(route);
 
-    refreshPageScrollTop(route);
+    refreshPageScrollTop(route === "shows" || route === "books" ? "import" : route);
 
   } catch (err) {
 
@@ -192,7 +198,9 @@ export function initRouter(ctx) {
 
   appCtx = ctx;
 
-  ctx.navigateTo = (route) => navigateTo(route);
+  ctx.catalogTab = "shows";
+
+  ctx.navigateTo = (route, options) => navigateTo(route, options);
 
   ctx.startPrepTraining = (sourceId, label) => {
 
@@ -206,7 +214,7 @@ export function initRouter(ctx) {
 
   ctx.openSourceVocab = (sourceId, label, backRoute = "shows") => {
 
-    navigateTo(backRoute, {
+    navigateTo("import", {
 
       sourceVocab: { sourceId, label, backRoute },
 
@@ -220,7 +228,9 @@ export function initRouter(ctx) {
 
     appCtx.sourceVocab = null;
 
-    navigateTo(back);
+    appCtx.catalogTab = back === "books" ? "books" : "shows";
+
+    navigateTo("import");
 
   };
 
@@ -241,4 +251,3 @@ function esc(s) {
   }[c]));
 
 }
-

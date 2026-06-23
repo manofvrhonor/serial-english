@@ -24,6 +24,39 @@ async function materializeSnapshots(ctx, sourceIds) {
   if (changed) ctx.save();
 }
 
+export async function mountBooksContent(mountEl, ctx) {
+  const chIds = (ctx.state.books || []).flatMap((b) => (b.chapters || []).map((c) => c.id));
+  await materializeSnapshots(ctx, chIds);
+
+  const books = ctx.state.books || [];
+
+  if (!books.length) {
+    mountEl.innerHTML = `
+      <div class="card card-padded list-empty">
+        Пока нет книг. Загрузите файл <b>.txt</b> выше —
+        книга и глава создадутся автоматически.
+      </div>`;
+    return;
+  }
+
+  const cards = books.map((book) => renderBookCard(ctx, book)).join("");
+
+  mountEl.innerHTML = `<div class="source-cards">${cards}</div>`;
+
+  mountEl.querySelectorAll(".tree-prep-btn").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      if (btn.disabled) return;
+      ctx.startPrepTraining?.(btn.dataset.source, btn.dataset.label);
+    });
+  });
+
+  mountEl.querySelectorAll(".source-vocab-btn").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      ctx.openSourceVocab?.(btn.dataset.source, btn.dataset.label, "books");
+    });
+  });
+}
+
 export async function renderBooks(el, ctx) {
   if (ctx.sourceVocab?.backRoute === "books") {
     await materializeSnapshots(ctx, [ctx.sourceVocab.sourceId]);
@@ -31,44 +64,12 @@ export async function renderBooks(el, ctx) {
     return;
   }
 
-  const chIds = (ctx.state.books || []).flatMap((b) => (b.chapters || []).map((c) => c.id));
-  await materializeSnapshots(ctx, chIds);
-
-  const books = ctx.state.books || [];
-
-  if (!books.length) {
-    el.innerHTML = `
-      <div class="page">
-      <h1 class="view-title view-title-section">Книги</h1>
-      <p class="view-subtitle">Вложенность: Книга → Глава.</p>
-      <div class="card card-padded list-empty">
-        Пока нет книг. Импортируйте файл <b>.txt</b> в разделе «Импорт» —
-        книга и глава создадутся автоматически.
-      </div>
-      </div>`;
-    return;
-  }
-
-  const cards = books.map((book) => renderBookCard(ctx, book)).join("");
-
   el.innerHTML = `
     <div class="page">
-    <h1 class="view-title view-title-section">Книги</h1>
-    <div class="source-cards">${cards}</div>
+      <h1 class="view-title view-title-section">Книги</h1>
+      <div id="books-mount"></div>
     </div>`;
-
-  el.querySelectorAll(".tree-prep-btn").forEach((btn) => {
-    btn.addEventListener("click", () => {
-      if (btn.disabled) return;
-      ctx.startPrepTraining?.(btn.dataset.source, btn.dataset.label);
-    });
-  });
-
-  el.querySelectorAll(".source-vocab-btn").forEach((btn) => {
-    btn.addEventListener("click", () => {
-      ctx.openSourceVocab?.(btn.dataset.source, btn.dataset.label, "books");
-    });
-  });
+  await mountBooksContent(el.querySelector("#books-mount"), ctx);
 }
 
 function renderBookCard(ctx, book) {
