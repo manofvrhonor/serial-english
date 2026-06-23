@@ -18,7 +18,7 @@
 4. Не сканировать `data/*.json` — только нужные `js/` файлы
 5. Dev: `python -m http.server 8081` → http://localhost:8081
 6. Прод: https://manofvrhonor.github.io/serial-english/
-7. Asset version: **`20260661`** — единый `?v=`; источник: `js/version.js`; bump при правках JS/CSS
+7. Asset version: **`20260673`** — единый `?v=`; источник: `js/version.js`; bump при правках JS/CSS
 
 **После сессии:** обновить §1 и §7 здесь; 5–15 строк в `docs/agent-changelog.md`.
 
@@ -34,9 +34,9 @@
 | GitHub | manofvrhonor/serial-english |
 | Lovable-референс | `D:\VIBECODING\word-weaver-offline` |
 
-**Текущая фаза:** polish **источников** и **тренировки** (сессия 2026-06-23). Библиотека + админ — закрыта.
+**Текущая фаза:** polish **mobile UX** (тренировка, HARD RESET, отображение слов). Каталог + библиотека + админ — закрыты.
 
-**На проде (main):** после push — `?v=20260661`.
+**На проде (main):** после push — `?v=20260673`.
 
 **Не переписывать без необходимости:** `js/core/`, `js/db/`, `js/import/`.
 
@@ -62,7 +62,7 @@
 |---------|--------|
 | Desktop: **sidebar** слева; toggle в **низу** sidebar (`.sidebar-footer`) | Контент на всю высоту; header убран — занимал ~3rem без пользы |
 | Нет `desktop-header`, нет «Оффлайн словарь» | Лишняя строка на каждой вкладке |
-| Mobile: **6 кнопок** в `mobile-nav` (Импорт·База·Тренировка·Сериалы·Книги·Настройки) | Прямой доступ; sheet «Ещё» добавлял лишний клик |
+| Mobile: **6 кнопок** в `mobile-nav` (Каталог·Словарь·Тренировка·Настройки + …) | Прямой доступ; «Каталог» объединяет импорт/сериалы/книги |
 | Нет `mobile-header` | Дублировал активный пункт нижнего меню |
 | `h1.view-title-section` **скрыт на mobile** | Заголовок = пункт nav; остаётся подзаголовок-описание |
 | Скролл в **`.content`**, не `window` | `html,body { overflow:hidden }`, `.app { height:100dvh }` — иначе ломается layout и scroll-top |
@@ -119,6 +119,7 @@
 | В режимах 1–2: ответ — **все переводы** из словаря, не один | `formatTranslations()` в `srs.js` |
 | Setup: табы **на всю ширину**; направление **«Оба»** по умолчанию; режимы **1/2/3 — мультивыбор** (без «Смешанный») | Случайный режим из включённых; счётчик «к повторению» — в галочке |
 | Карточка: **свайп** ← Не знаю / Знаю →; кнопки **Знаю / Не знаю**; **«исправить слово»** → попап (перевод, стоп, выучено) | `swipe-card.js`, `train-edit-modal.js` |
+| Mobile-сессия: **без h1 «Тренировка»**; «Верно!/Не verno!» **на карточке под словом** (не под вариантами); компактные отступы карточки | Экран целиком на телефоне |
 | Подготовка к серии/главе: `ctx.startPrepTraining()` | См. §4 — не импортировать router из views |
 
 ### 2.6 Данные и логика
@@ -126,6 +127,8 @@
 | Решение | Почему |
 |---------|--------|
 | `stopList`: **`{ lemma, translations }`**, не строки | При удалении слова переводы сохраняются; миграция `normalizeStopList()` |
+| Отображение слов/переводов: **`titleCase()`** в `js/core/display-text.js` | Единая заглавная буква в UI; данные в IndexedDB без изменения |
+| HARD RESET: **два модала** (предупреждение → «ВЫ ТОЧНО…»); кнопки **столбцом на всю ширину**; Отмена/Нет — **`btn-dark`** (чёрные), Удалить/Да — красные | Отмена заметна; двойное подтверждение |
 | Стоп-лист **пустой** при первом запуске | Пользователь сам наполняет; встроенный ~40 слов удалён |
 | «Знаю» при импорте → карточка с переводами | Не только запись в `knowledge` |
 | Лемматизация = **lookup** в `forms.json.gz` | Не обрезка суффиксов — см. spec §2 |
@@ -193,9 +196,9 @@ serial-english/
     ├── ui/  swipe-card, trans-chips, scroll-top, sources-modal, train-edit-modal, action-icons, version.js
     ├── db/database.js
     ├── import/  dictionary.js, phrases.js
-    ├── core/  analyzer, parser, lemmatizer, srs, readiness.js, …
+    ├── core/  analyzer, parser, lemmatizer, srs, readiness.js, display-text.js, …
     └── views/
-        ├── import.js, knowledge.js, training.js
+        ├── catalog.js, import.js, knowledge.js, training.js
         ├── study-words.js, study-phrases.js
         ├── shows.js, books.js, source-vocab.js, settings.js
 ```
@@ -221,7 +224,7 @@ serial-english/
 
 ## 7. Следующий шаг
 
-**Источники + тренировки** — в `main` после push (`?v=20260661`). Дальше по желанию: второй сериал в библиотеку, PWA, polish админ-курирования.
+**Mobile polish** — в `main` после push (`?v=20260673`). Дальше по желанию: второй сериал в библиотеку, PWA, polish админ-курирования.
 
 **Dev:** `python -m http.server 8081` из корня проекта — библиотека не работает через `file://`.
 

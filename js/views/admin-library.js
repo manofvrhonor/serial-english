@@ -5,6 +5,7 @@ import { getDictionary, getFormsIndex, translate } from "../import/dictionary.js
 import { getPhrases, translatePhrase } from "../import/phrases.js";
 import { unzipFile, entryText, filterSrtEntries } from "../import/zip.js";
 import { transChipsHtml, bindTransChipsContainers } from "../ui/trans-chips.js?v=20260621";
+import { titleCase } from "../core/display-text.js";
 
 const DRAFT_KEY = "se-admin-draft";
 
@@ -575,7 +576,7 @@ function episodeItemRow(item, idx) {
   return `
     <div class="admin-item" data-idx="${idx}">
       <div class="admin-item-head">
-        <span class="admin-item-text">${esc(key)}</span>
+        <span class="admin-item-text">${esc(titleCase(key))}</span>
         <span class="import-row-meta">×${item.count || 1}</span>
         ${done
     ? `<button type="button" class="admin-item-undo btn btn-sm outline" data-key="${escAttr(key)}" aria-label="Вернуть">Вернуть</button>`
@@ -593,7 +594,7 @@ function seasonItemRow(agg) {
   return `
     <div class="admin-item" data-key="${escAttr(agg.key)}">
       <div class="admin-item-head">
-        <span class="admin-item-text">${esc(agg.display)}</span>
+        <span class="admin-item-text">${esc(titleCase(agg.display))}</span>
         <span class="import-row-meta">×${agg.count}</span>
         ${done
     ? `<button type="button" class="admin-item-undo btn btn-sm outline" data-key="${escAttr(agg.key)}" aria-label="Вернуть">Вернуть</button>`

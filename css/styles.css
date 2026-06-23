@@ -350,6 +350,14 @@ button, input, select, textarea { font: inherit; }
 .btn-danger { background: var(--destructive); color: var(--destructive-foreground); }
 .btn-danger:hover { opacity: 0.9; }
 
+.btn-dark {
+  background: var(--foreground);
+  color: var(--background);
+  box-shadow: 0 1px 2px oklch(0 0 0 / 12%);
+}
+
+.btn-dark:hover { opacity: 0.92; }
+
 .btn-ghost {
   background: transparent;
   color: var(--foreground);
@@ -1034,10 +1042,8 @@ textarea:focus-visible {
 
 .train-session-top {
   display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: 0.75rem;
-  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem;
 }
 
 .train-session-badges {
@@ -1045,7 +1051,7 @@ textarea:focus-visible {
   align-items: center;
   gap: 0.375rem;
   flex-wrap: wrap;
-  justify-content: flex-end;
+  width: 100%;
 }
 
 .train-badge {
@@ -1159,6 +1165,24 @@ textarea:focus-visible {
   margin-bottom: 0;
 }
 
+@media (max-width: 767px) {
+  .train-session { gap: 0.625rem; }
+  .train-swipe-stage {
+    height: auto;
+    min-height: 0;
+  }
+  .train-card.train-card-prompt,
+  .train-card-static.train-card-prompt {
+    min-height: 0;
+  }
+  .train-card-prompt {
+    min-height: 0;
+    padding: 1rem 1.25rem;
+  }
+  .train-prompt { font-size: 1.5rem; }
+  .train-edit-btn { margin-top: 0.5rem; }
+}
+
 .train-options-wrap {
   display: flex;
   flex-direction: column;
@@ -1197,7 +1221,12 @@ textarea:focus-visible {
 .train-option:disabled { cursor: default; }
 .train-option-correct { border-color: var(--success) !important; background: var(--success-bg); }
 .train-option-wrong { border-color: var(--destructive) !important; background: oklch(from var(--destructive) l c h / 10%); }
-.train-feedback { margin-top: 12px; font-size: 1rem; font-weight: 600; }
+.train-card-feedback {
+  font-size: 1rem;
+  font-weight: 600;
+  min-height: 1.25rem;
+}
+.train-card-feedback[hidden] { display: none; }
 .train-fb-ok { color: var(--success); }
 .train-fb-bad { color: var(--destructive); }
 
@@ -2168,6 +2197,15 @@ textarea:focus-visible {
   gap: 0.5rem;
   justify-content: flex-end;
   margin-top: 1rem;
+}
+
+.modal-actions-stack {
+  flex-direction: column;
+  align-items: stretch;
+}
+
+.modal-actions-stack .btn-block {
+  width: 100%;
 }
 
 /* ===== Tabs (Lovable-style) ===== */

@@ -91,9 +91,20 @@ export function renderSettings(el, ctx) {
           <li>стоп-лист (очистится)</li>
         </ul>
         <p class="modal-warning">Сохраните экспорт .json, если хотите восстановить данные позже.</p>
-        <div class="modal-actions">
-          <button type="button" class="btn secondary" id="hard-reset-cancel">Отмена</button>
-          <button type="button" class="btn btn-danger" id="hard-reset-confirm">Удалить всё</button>
+        <div class="modal-actions modal-actions-stack">
+          <button type="button" class="btn btn-dark btn-block" id="hard-reset-cancel">Отмена</button>
+          <button type="button" class="btn btn-danger btn-block" id="hard-reset-confirm">Удалить всё</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="modal" id="hard-reset-final-modal" hidden>
+      <div class="modal-backdrop" id="hard-reset-final-backdrop"></div>
+      <div class="modal-card card card-padded modal-card-danger" role="alertdialog" aria-labelledby="hard-reset-final-title">
+        <h2 class="settings-heading" id="hard-reset-final-title">ВЫ ТОЧНО ХОТИТЕ ВСЁ УДАЛИТЬ?</h2>
+        <div class="modal-actions modal-actions-stack">
+          <button type="button" class="btn btn-dark btn-block" id="hard-reset-final-no">Нет</button>
+          <button type="button" class="btn btn-danger btn-block" id="hard-reset-final-yes">Да</button>
         </div>
       </div>
     </div>
@@ -127,8 +138,11 @@ export function renderSettings(el, ctx) {
   });
 
   const modal = el.querySelector("#hard-reset-modal");
+  const finalModal = el.querySelector("#hard-reset-final-modal");
   const openModal = () => { modal.hidden = false; };
   const closeModal = () => { modal.hidden = true; };
+  const openFinalModal = () => { finalModal.hidden = false; };
+  const closeFinalModal = () => { finalModal.hidden = true; };
 
   const adminToggle = el.querySelector("#admin-toggle");
   const adminActions = el.querySelector("#admin-actions");
@@ -198,9 +212,17 @@ export function renderSettings(el, ctx) {
   el.querySelector("#hard-reset-backdrop").addEventListener("click", closeModal);
 
   el.querySelector("#hard-reset-confirm").addEventListener("click", () => {
+    closeModal();
+    openFinalModal();
+  });
+
+  el.querySelector("#hard-reset-final-no").addEventListener("click", closeFinalModal);
+  el.querySelector("#hard-reset-final-backdrop").addEventListener("click", closeFinalModal);
+
+  el.querySelector("#hard-reset-final-yes").addEventListener("click", () => {
     hardResetState(ctx.state);
     ctx.save();
-    closeModal();
+    closeFinalModal();
     renderSettings(el, ctx);
     flash(el, "Данные полностью сброшены");
   });

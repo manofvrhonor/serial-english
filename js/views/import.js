@@ -18,6 +18,7 @@ import { attachSwipeCard } from "../ui/swipe-card.js";
 import { transChipsHtml, bindTransChipsContainers } from "../ui/trans-chips.js?v=20260621";
 import { refreshPageScrollTop, unbindScrollTop } from "../ui/scroll-top.js";
 import { btnLearned, btnStopList } from "../ui/action-icons.js";
+import { titleCase } from "../core/display-text.js";
 
 let session = null;
 let swipeDetach = null;
@@ -495,7 +496,7 @@ function buildConfirmBody(words, phrases) {
     ? `
       <div class="import-confirm-section">
         <p class="import-confirm-heading">Слова — <strong>${words.length}</strong></p>
-        <ul class="import-confirm-list">${words.map((w) => `<li>${esc(w.lemma)}</li>`).join("")}</ul>
+        <ul class="import-confirm-list">${words.map((w) => `<li>${esc(titleCase(w.lemma))}</li>`).join("")}</ul>
       </div>`
     : "";
 
@@ -503,7 +504,7 @@ function buildConfirmBody(words, phrases) {
     ? `
       <div class="import-confirm-section">
         <p class="import-confirm-heading">Выражения — <strong>${phrases.length}</strong></p>
-        <ul class="import-confirm-list">${phrases.map((p) => `<li>${esc(p.text)}</li>`).join("")}</ul>
+        <ul class="import-confirm-list">${phrases.map((p) => `<li>${esc(titleCase(p.text))}</li>`).join("")}</ul>
       </div>`
     : "";
 
@@ -691,7 +692,7 @@ function renderWordCards(el, ctx) {
   const i = session.words.indexOf(w);
   const trans = resolveTranslations(w);
   const transHtml = trans.length
-    ? esc(trans[0]) + (trans.length > 1 ? `<span class="import-row-meta"> +${trans.length - 1}</span>` : "")
+    ? esc(titleCase(trans[0])) + (trans.length > 1 ? `<span class="import-row-meta"> +${trans.length - 1}</span>` : "")
     : `<span class="muted">нет перевода</span>`;
   const forms = (w.forms || []).slice(0, 5).map((f) => `<span class="chip">${esc(f)}</span>`).join("");
 
@@ -704,7 +705,7 @@ function renderWordCards(el, ctx) {
           <div class="swipe-hint swipe-hint-right" hidden>ЗНАЮ</div>
           <div class="swipe-hint swipe-hint-up" hidden>ИМПОРТ ↑</div>
           <div class="swipe-card-inner">
-            <div class="swipe-card-word">${esc(w.lemma)}</div>
+            <div class="swipe-card-word">${esc(titleCase(w.lemma))}</div>
             <div class="import-row-meta">встречается ${w.count}×</div>
             <div class="swipe-card-trans ${trans.length ? "" : "muted"}">${transHtml}</div>
             <div style="margin-top:0.75rem">${forms}</div>
@@ -778,7 +779,7 @@ function wordRowCard(w, i) {
       <div class="import-row-main">
         <input type="checkbox" data-kind="word" data-i="${i}" ${w.included ? "checked" : ""} />
         <div>
-          <div class="import-row-title">${esc(w.lemma)} <span class="import-row-meta">×${w.count}</span> <span class="tag tag-new">новое</span></div>
+          <div class="import-row-title">${esc(titleCase(w.lemma))} <span class="import-row-meta">×${w.count}</span> <span class="tag tag-new">новое</span></div>
           <div>${forms}</div>
         </div>
       </div>
@@ -834,7 +835,7 @@ function renderPhraseCards(el, ctx) {
   const i = session.phrases.indexOf(p);
   const trans = resolveTranslations(p);
   const transHtml = trans.length
-    ? esc(trans[0]) + (trans.length > 1 ? `<span class="import-row-meta"> +${trans.length - 1}</span>` : "")
+    ? esc(titleCase(trans[0])) + (trans.length > 1 ? `<span class="import-row-meta"> +${trans.length - 1}</span>` : "")
     : `<span class="muted">нет перевода</span>`;
 
   return `
@@ -845,7 +846,7 @@ function renderPhraseCards(el, ctx) {
           <div class="swipe-hint swipe-hint-right" hidden>ЗНАЮ</div>
           <div class="swipe-hint swipe-hint-up" hidden>ИМПОРТ ↑</div>
           <div class="swipe-card-inner">
-            <div class="swipe-card-word">${esc(p.text)}</div>
+            <div class="swipe-card-word">${esc(titleCase(p.text))}</div>
             <div class="import-row-meta">встречается ${p.count}×</div>
             <div class="swipe-card-trans ${trans.length ? "" : "muted"}">${transHtml}</div>
           </div>
@@ -946,7 +947,7 @@ function phraseRowCard(p, i) {
       <div class="import-row-main">
         <input type="checkbox" data-kind="phrase" data-i="${i}" ${p.included ? "checked" : ""} />
         <div>
-          <div class="import-row-title">${esc(p.text)} <span class="import-row-meta">×${p.count}</span> <span class="tag tag-new">новое</span></div>
+          <div class="import-row-title">${esc(titleCase(p.text))} <span class="import-row-meta">×${p.count}</span> <span class="tag tag-new">новое</span></div>
         </div>
       </div>
       <div class="import-row-trans">${translationCell(p, i, "phrase")}</div>

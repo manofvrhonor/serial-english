@@ -25,6 +25,7 @@ import { getDictionary } from "../import/dictionary.js";
 import { getPhrases } from "../import/phrases.js";
 import { btnLearned, btnStopList, btnReturnStudy } from "../ui/action-icons.js";
 import { transChipsHtml, bindTransChipsContainers } from "../ui/trans-chips.js?v=20260621";
+import { titleCase } from "../core/display-text.js";
 import { bindScrollTop } from "../ui/scroll-top.js";
 
 const STATUS_FILTERS = [
@@ -165,7 +166,7 @@ function entryRow(entry, state) {
 
   return `
     <tr data-kind="${entry.kind}" data-key="${keyAttr}" data-status="${entry.status}"${itemId ? ` data-item-id="${itemId}"` : ""}>
-      <td class="col-word"><strong>${esc(entry.key)}</strong></td>
+      <td class="col-word"><strong>${esc(titleCase(entry.key))}</strong></td>
       <td class="col-trans-cell">${transCellHtml(entry, state)}</td>
       <td class="col-actions">
         <div class="row-actions">${actionButtons(entry)}</div>
@@ -182,7 +183,7 @@ function canEditTranslations(entry) {
 function transCellHtml(entry, state) {
   if (!canEditTranslations(entry)) {
     const trans = displayTranslations(state, entry);
-    const transText = trans.length ? trans.map((t) => esc(t)).join(" · ") : "—";
+    const transText = trans.length ? trans.map((t) => esc(titleCase(t))).join(" · ") : "—";
     return `<span class="sv-trans">${transText}</span>`;
   }
 

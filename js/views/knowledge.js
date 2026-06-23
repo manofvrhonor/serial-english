@@ -20,6 +20,7 @@ import { getDictionary, translate } from "../import/dictionary.js";
 import { getPhrases, translatePhrase } from "../import/phrases.js";
 import { transChipsHtml, bindTransChipsContainers } from "../ui/trans-chips.js?v=20260621";
 import { btnReturnStudy, btnStopList, btnDeleteWord, btnRemove } from "../ui/action-icons.js";
+import { titleCase, titleCaseList } from "../core/display-text.js";
 import { countTrainingItems } from "../core/srs.js";
 import { mountWordsPanel } from "./study-words.js?v=20260657";
 import { mountPhrasesPanel } from "./study-phrases.js?v=20260657";
@@ -419,11 +420,11 @@ function stopPhrasesEmptyRow() {
 
 function learnedWordRow(entry) {
   const { lemma, word } = entry;
-  const trans = word?.translations?.length ? word.translations.join(", ") : "—";
+  const trans = word?.translations?.length ? titleCaseList(word.translations) : "—";
 
   return `
     <tr data-lemma="${escAttr(lemma)}">
-      <td class="col-word"><strong>${esc(lemma)}</strong></td>
+      <td class="col-word"><strong>${esc(titleCase(lemma))}</strong></td>
       <td class="col-trans-cell">${esc(trans)}</td>
       <td class="col-actions">
         <div class="row-actions">
@@ -436,11 +437,11 @@ function learnedWordRow(entry) {
 
 function learnedPhraseRow(entry) {
   const { text, phrase } = entry;
-  const trans = phrase?.translations?.length ? phrase.translations.join(", ") : "—";
+  const trans = phrase?.translations?.length ? titleCaseList(phrase.translations) : "—";
 
   return `
     <tr data-text="${escAttr(text)}">
-      <td class="col-word"><strong>${esc(text)}</strong></td>
+      <td class="col-word"><strong>${esc(titleCase(text))}</strong></td>
       <td class="col-trans-cell">${esc(trans)}</td>
       <td class="col-actions">
         <div class="row-actions">
@@ -453,11 +454,11 @@ function learnedPhraseRow(entry) {
 
 function stopWordRow(entry) {
   const { lemma, translations } = entry;
-  const trans = translations?.length ? translations.join(", ") : "—";
+  const trans = translations?.length ? titleCaseList(translations) : "—";
 
   return `
     <tr data-lemma="${escAttr(lemma)}">
-      <td class="col-word"><strong>${esc(lemma)}</strong></td>
+      <td class="col-word"><strong>${esc(titleCase(lemma))}</strong></td>
       <td class="col-trans-cell">${esc(trans)}</td>
       <td class="col-actions">
         <div class="row-actions">

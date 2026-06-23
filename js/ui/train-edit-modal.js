@@ -8,6 +8,7 @@ import {
   deleteWord,
 } from "../db/database.js";
 import { transChipsHtml, bindTransChipsContainers } from "./trans-chips.js?v=20260621";
+import { titleCase } from "../core/display-text.js";
 
 let modalReady = false;
 let chipsRoot = null;
@@ -85,7 +86,7 @@ export function openTrainEditModal(ctx, { kind, itemId, onClose, onRemoved }) {
   modal.querySelector("#train-edit-title").textContent = kind === "word"
     ? "Исправить слово"
     : "Исправить выражение";
-  modal.querySelector("#train-edit-lemma").textContent = label;
+  modal.querySelector("#train-edit-lemma").textContent = titleCase(label);
   modal.querySelector("#train-edit-stop").hidden = kind !== "word";
 
   chipsRoot.innerHTML = transChipsHtml(item.translations || [], {

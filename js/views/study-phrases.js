@@ -6,6 +6,7 @@ import {
 import { transChipsHtml, bindTransChipsContainers } from "../ui/trans-chips.js?v=20260621";
 import { openSourcesModal } from "../ui/sources-modal.js?v=20260657";
 import { btnLearned, btnDeleteWord, btnSources } from "../ui/action-icons.js";
+import { titleCase } from "../core/display-text.js";
 
 import { bindScrollTop } from "../ui/scroll-top.js";
 
@@ -85,7 +86,7 @@ function rowHtml(p) {
 
   return `
     <tr data-id="${p.id}">
-      <td class="col-word"><strong>${esc(p.text)}</strong>${manualTag ? ` ${manualTag}` : ""}</td>
+      <td class="col-word"><strong>${esc(titleCase(p.text))}</strong>${manualTag ? ` ${manualTag}` : ""}</td>
       <td class="col-trans-cell">${transChipsHtml(p.translations || [], { id: p.id })}</td>
       <td class="col-actions">
         <div class="row-actions">

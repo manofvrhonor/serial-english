@@ -1,5 +1,6 @@
 import { todayStr, markWordLearned, markPhraseLearned, isTrainableItem } from "../db/database.js";
 import { isSnapshotPrepItem } from "./readiness.js";
+import { titleCase } from "./display-text.js";
 
 const WEIGHTS = [6, 3, 1];
 
@@ -74,7 +75,7 @@ export function getItemTranslations(item) {
 }
 
 export function formatTranslations(translations, separator = " · ") {
-  return getItemTranslations({ translations }).join(separator);
+  return getItemTranslations({ translations }).map(titleCase).join(separator);
 }
 
 function getEnglish(item, kind) {
@@ -93,7 +94,7 @@ function choiceOptionForItem(item, kind, direction) {
   }
   return {
     itemId: item.id,
-    label: english,
+    label: titleCase(english),
     acceptable: [english],
   };
 }
@@ -165,13 +166,14 @@ export function buildOptions(state, item, kind, direction, acceptableAnswers = n
 
 export function prepareCard(state, entry, mode) {
   const { kind, item, direction } = entry;
-  const english = getEnglish(item, kind);
+  const englishRaw = getEnglish(item, kind);
+  const english = titleCase(englishRaw);
   const allTrans = getItemTranslations(item);
   const translationsText = formatTranslations(allTrans);
 
   const prompt = direction === "enru" ? english : translationsText;
   const answer = direction === "enru" ? translationsText : english;
-  const acceptableAnswers = direction === "enru" ? allTrans : [english];
+  const acceptableAnswers = direction === "enru" ? allTrans : [englishRaw];
 
   let effectiveMode = mode;
   let options = [];

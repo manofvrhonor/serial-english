@@ -1,3 +1,5 @@
+import { titleCase } from "../core/display-text.js";
+
 const MAX_TRANS = 3;
 
 const rootHandlers = new WeakMap();
@@ -14,7 +16,7 @@ export function transChipsHtml(translations, { id, editable = true, max = MAX_TR
   const list = (translations || []).filter(Boolean).slice(0, max);
   const chips = list.map((t, idx) => `
     <span class="trans-chip" draggable="${editable ? "true" : "false"}" data-idx="${idx}" title="Перетащите для смены порядка">
-      <span class="trans-chip-text">${esc(t)}</span>
+      <span class="trans-chip-text">${esc(titleCase(t))}</span>
       ${editable ? `<button type="button" class="trans-chip-remove" aria-label="Удалить перевод">×</button>` : ""}
     </span>`).join("");
 

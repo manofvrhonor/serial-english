@@ -379,10 +379,6 @@ function renderCard(el, ctx) {
 function renderSessionHeader(mode, progress, dir) {
   return `
     <div class="train-session-top">
-      <h1 class="train-page-title">
-        ${ICON_CAP}
-        Тренировка
-      </h1>
       <div class="train-session-badges">
         <span class="train-badge train-badge-outline">${esc(modeLabel(mode))}</span>
         <span class="train-badge train-badge-progress">${progress}</span>
@@ -403,7 +399,17 @@ function revealCard(el, ctx) {
 }
 
 function renderPromptOnly(card) {
-  return `<div class="train-prompt">${esc(card.prompt)}</div>`;
+  return `
+    <div class="train-prompt">${esc(card.prompt)}</div>
+    <div id="train-card-feedback" class="train-card-feedback" hidden></div>`;
+}
+
+function showCardFeedback(el, correct) {
+  const fb = el.querySelector("#train-card-feedback");
+  if (!fb) return;
+  fb.hidden = false;
+  fb.textContent = correct ? "Верно!" : "Не верно!";
+  fb.className = `train-card-feedback ${correct ? "train-fb-ok" : "train-fb-bad"}`;
 }
 
 function isCorrectOption(card, option) {
@@ -414,7 +420,7 @@ function findOption(card, itemId) {
   return card.options.find((o) => o.itemId === itemId);
 }
 
-function renderOptionsBlock(card, answered, feedbackHtml = "") {
+function renderOptionsBlock(card, answered) {
   const options = card.options.map((opt) => {
     const isCorrect = answered && isCorrectOption(card, opt);
     const classes = ["train-option"];
@@ -431,7 +437,6 @@ function renderOptionsBlock(card, answered, feedbackHtml = "") {
   return `
     <div class="train-options-wrap">
       <div class="train-options" id="train-options">${options}</div>
-      <div id="train-feedback" class="train-feedback" ${feedbackHtml ? "" : "hidden"}>${feedbackHtml}</div>
     </div>`;
 }
 
@@ -501,12 +506,7 @@ function bindCardEvents(el, ctx) {
         }
       });
 
-      const fb = el.querySelector("#train-feedback");
-      if (fb) {
-        fb.hidden = false;
-        fb.textContent = correct ? "Верно!" : `Правильно: ${card.answer}`;
-        fb.className = `train-feedback ${correct ? "train-fb-ok" : "train-fb-bad"}`;
-      }
+      showCardFeedback(el, correct);
 
       finishCard(el, ctx, correct, true);
       el.querySelector("#train-actions").innerHTML = renderActions(card, mode, true, true);

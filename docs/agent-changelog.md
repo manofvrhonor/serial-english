@@ -5,6 +5,20 @@
 
 ---
 
+## Сессия 2026-06-23 — mobile polish: тренировка, слова, HARD RESET (закрыта)
+
+**Каталог (`catalog.js`, `router.js`, nav):** единый раздел «Каталог» (импорт + сериалы + книги) — в `main` с коммита `a22805a`.
+
+**Тренировка (`training.js`, `styles.css`):** mobile — без h1 «Тренировка» в сессии; «Верно!/Не verno!» на карточке под словом; компактные отступы карточки.
+
+**Отображение слов (`display-text.js`, `srs.js`, `trans-chips.js`, views):** `titleCase()` — единая заглавная буква в UI (карточки, варианты, словарь, чипы); данные в БД не меняются.
+
+**HARD RESET (`settings.js`, `styles.css`):** кнопки столбцом на всю ширину; второй модал «ВЫ ТОЧНО ХОТИТЕ ВСЁ УДАЛИТЬ?» (Нет/Да); Отмена и Нет — чёрные `btn-dark`.
+
+**Версия:** `?v=20260673`. **Деплой:** commit + push в `main`.
+
+---
+
 ## Сессия 2026-06-23 — источники, polish тренировки (закрыта)
 
 **Источники (`database.js`, `library.js`, `readiness.js`, `sources-modal.js`):** при повторном импорте дописывается `sources` у существующих карточек; `repairSourcesFromVocabulary` при загрузке; в попапе группировка «Сериал - S01 - 01-07».
@@ -325,6 +339,7 @@
 
 - `hardResetState()` сбрасывает words, phrases, shows, books, knowledge, sessionHistory, стоп-лист.
 - Не трогает `data/*.json(.gz)`. Интервалы [1,3,7,16,30] остаются.
+- UI: два модала (`#hard-reset-modal` → `#hard-reset-final-modal`); кнопки `modal-actions-stack`; отмена — `btn-dark`.
 
 ---
 

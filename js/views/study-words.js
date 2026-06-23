@@ -6,6 +6,7 @@ import {
 import { transChipsHtml, bindTransChipsContainers } from "../ui/trans-chips.js?v=20260621";
 import { openSourcesModal } from "../ui/sources-modal.js?v=20260657";
 import { btnLearned, btnStopList, btnSources } from "../ui/action-icons.js";
+import { titleCase } from "../core/display-text.js";
 
 import { bindScrollTop } from "../ui/scroll-top.js";
 
@@ -88,7 +89,7 @@ function rowHtml(w) {
 
   return `
     <tr data-id="${w.id}">
-      <td class="col-word"><strong>${esc(w.lemma)}</strong></td>
+      <td class="col-word"><strong>${esc(titleCase(w.lemma))}</strong></td>
       <td class="col-trans-cell">${transChipsHtml(w.translations || [], { id: w.id })}</td>
       <td class="col-actions">
         <div class="row-actions">
