@@ -1,0 +1,11 @@
+{
+  "shows": [
+    {
+      "id": "gravity-falls",
+      "title": "Gravity Falls",
+      "file": "gravity-falls.json",
+      "seasons": 1,
+      "episodes": 20
+    }
+  ]
+}

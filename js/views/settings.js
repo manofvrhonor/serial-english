@@ -4,6 +4,7 @@ import {
   updateIntervals,
   hardResetState,
 } from "../db/database.js";
+import { isAdminMode, setAdminMode, verifyAdminPassword } from "../core/admin-gate.js";
 
 export function renderSettings(el, ctx) {
   const intervals = ctx.state.settings?.intervals || [1, 3, 7, 16, 30];
@@ -11,7 +12,6 @@ export function renderSettings(el, ctx) {
   el.innerHTML = `
     <div class="page settings-page">
     <h1 class="view-title view-title-section">Настройки</h1>
-    <p class="view-subtitle">Интервалы SRS, экспорт и импорт данных.</p>
 
     <div class="settings-stack">
 
@@ -40,12 +40,41 @@ export function renderSettings(el, ctx) {
         <p id="settingsMsg" class="settings-msg"></p>
       </section>
 
+      <section class="card card-padded settings-card">
+        <h2 class="settings-heading">Админ-режим</h2>
+        <p class="settings-hint">Инструмент авторинга библиотеки сериалов. Не криптозащита — только скрытие раздела.</p>
+        <label class="admin-toggle-row">
+          <input type="checkbox" id="admin-toggle" ${isAdminMode() ? "checked" : ""} />
+          <span>Включить админ-режим</span>
+        </label>
+        <div id="admin-actions" ${isAdminMode() ? "" : "hidden"}>
+          <button type="button" class="btn" id="admin-library-btn">Открыть админ-библиотеку</button>
+        </div>
+        <p id="adminMsg" class="settings-msg"></p>
+      </section>
+
       <section class="card card-padded settings-card settings-danger">
         <h2 class="settings-heading">HARD RESET</h2>
         <p class="settings-hint">Удалить все слова, выражения, сериалы, книги, прогресс SRS и историю. Стоп-лист будет очищен.</p>
         <button type="button" id="hard-reset-open" class="btn btn-danger">HARD RESET — начать с нуля</button>
       </section>
 
+    </div>
+
+    <div class="modal" id="admin-password-modal" hidden>
+      <div class="modal-backdrop" id="admin-password-backdrop"></div>
+      <div class="modal-card card card-padded" role="dialog" aria-labelledby="admin-password-title">
+        <h2 class="settings-heading" id="admin-password-title">Пароль администратора</h2>
+        <label class="field-label field-full">
+          <span>Пароль</span>
+          <input type="password" id="admin-password-input" autocomplete="off" inputmode="numeric" />
+        </label>
+        <p id="admin-password-err" class="settings-msg settings-msg-err" hidden></p>
+        <div class="modal-actions">
+          <button type="button" class="btn secondary" id="admin-password-cancel">Отмена</button>
+          <button type="button" class="btn" id="admin-password-confirm">Войти</button>
+        </div>
+      </div>
     </div>
 
     <div class="modal" id="hard-reset-modal" hidden>
@@ -101,6 +130,69 @@ export function renderSettings(el, ctx) {
   const openModal = () => { modal.hidden = false; };
   const closeModal = () => { modal.hidden = true; };
 
+  const adminToggle = el.querySelector("#admin-toggle");
+  const adminActions = el.querySelector("#admin-actions");
+  const adminPwdModal = el.querySelector("#admin-password-modal");
+  const adminPwdInput = el.querySelector("#admin-password-input");
+  const adminPwdErr = el.querySelector("#admin-password-err");
+
+  const closeAdminPwdModal = () => {
+    adminPwdModal.hidden = true;
+    adminPwdInput.value = "";
+    adminPwdErr.hidden = true;
+    adminPwdErr.textContent = "";
+  };
+
+  const openAdminPwdModal = () => {
+    adminPwdModal.hidden = false;
+    adminPwdErr.hidden = true;
+    adminPwdErr.textContent = "";
+    requestAnimationFrame(() => adminPwdInput.focus());
+  };
+
+  adminToggle.addEventListener("change", () => {
+    if (adminToggle.checked) {
+      if (isAdminMode()) {
+        adminActions.hidden = false;
+        return;
+      }
+      adminToggle.checked = false;
+      openAdminPwdModal();
+      return;
+    }
+    setAdminMode(false);
+    adminActions.hidden = true;
+    flashAdmin(el, "Админ-режим выключен");
+  });
+
+  el.querySelector("#admin-password-cancel").addEventListener("click", closeAdminPwdModal);
+  el.querySelector("#admin-password-backdrop").addEventListener("click", closeAdminPwdModal);
+
+  const submitAdminPassword = () => {
+    if (!verifyAdminPassword(adminPwdInput.value)) {
+      adminPwdErr.textContent = "Неверный пароль";
+      adminPwdErr.hidden = false;
+      adminPwdInput.focus();
+      adminPwdInput.select();
+      return;
+    }
+    setAdminMode(true);
+    adminToggle.checked = true;
+    adminActions.hidden = false;
+    closeAdminPwdModal();
+    flashAdmin(el, "Админ-режим включён");
+  };
+
+  el.querySelector("#admin-password-confirm").addEventListener("click", submitAdminPassword);
+  adminPwdInput.addEventListener("keydown", (e) => {
+    if (e.key === "Enter") submitAdminPassword();
+    if (e.key === "Escape") closeAdminPwdModal();
+  });
+
+  el.querySelector("#admin-library-btn").addEventListener("click", () => {
+    ctx.navigateTo("library-admin");
+  });
+
   el.querySelector("#hard-reset-open").addEventListener("click", openModal);
   el.querySelector("#hard-reset-cancel").addEventListener("click", closeModal);
   el.querySelector("#hard-reset-backdrop").addEventListener("click", closeModal);
@@ -116,6 +208,13 @@ export function renderSettings(el, ctx) {
 
 function flash(el, text, isError = false) {
   const msg = el.querySelector("#settingsMsg");
+  if (!msg) return;
+  msg.textContent = text;
+  msg.className = `settings-msg ${isError ? "settings-msg-err" : "settings-msg-ok"}`;
+}
+
+function flashAdmin(el, text, isError = false) {
+  const msg = el.querySelector("#adminMsg");
   if (!msg) return;
   msg.textContent = text;
   msg.className = `settings-msg ${isError ? "settings-msg-err" : "settings-msg-ok"}`;

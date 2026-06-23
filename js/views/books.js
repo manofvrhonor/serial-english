@@ -7,7 +7,7 @@ import {
   ensureSnapshotItems,
   sourceNeedsMaterialize,
 } from "../core/readiness.js";
-import { renderSourceVocab } from "./source-vocab.js?v=20260639";
+import { renderSourceVocab } from "./source-vocab.js?v=20260653";
 import { getDictionary } from "../import/dictionary.js";
 import { getPhrases } from "../import/phrases.js";
 

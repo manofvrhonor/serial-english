@@ -7,6 +7,13 @@ import {
 import { ensureSnapshotItems } from "../core/readiness.js";
 import { getDictionary, getFormsIndex, translate, translatorUrl } from "../import/dictionary.js";
 import { getPhrases, translatePhrase } from "../import/phrases.js";
+import {
+  getLibraryIndex,
+  getLibraryShow,
+  importLibraryEpisodes,
+  listShowEpisodes,
+  parseEpisodeKey,
+} from "../import/library.js?v=20260655";
 import { attachSwipeCard } from "../ui/swipe-card.js";
 import { transChipsHtml, bindTransChipsContainers } from "../ui/trans-chips.js?v=20260621";
 import { refreshPageScrollTop, unbindScrollTop } from "../ui/scroll-top.js";
@@ -16,6 +23,7 @@ let session = null;
 let swipeDetach = null;
 let pendingImportCommit = null;
 let importConfirmModalReady = false;
+let libPicker = null;
 
 const defaultUi = () => ({
   tab: "words",
@@ -39,10 +47,13 @@ export function renderImport(el, ctx) {
             <input type="file" id="import-file" accept=".srt,.txt" hidden />
             <span class="import-filebtn btn btn-lg">Загрузить новый файл</span>
           </label>
+          <button type="button" class="btn btn-lg outline" id="import-library-btn">Выбрать из библиотеки</button>
           <span id="import-filename" class="import-filename">srt или txt</span>
         </div>
         <div id="import-meta" class="import-meta" hidden></div>
       </div>
+
+      <div id="import-library" class="import-library" hidden></div>
 
       <div id="import-result" class="import-result" hidden></div>
     </div>
@@ -59,6 +70,8 @@ export function renderImport(el, ctx) {
   ensureImportConfirmModal();
   el.querySelector("#import-file")
     .addEventListener("change", (e) => handleFile(el, ctx, e.target.files?.[0]));
+  el.querySelector("#import-library-btn")
+    ?.addEventListener("click", () => openLibraryPicker(el, ctx));
 }
 
 async function handleFile(el, ctx, file) {
@@ -1094,6 +1107,312 @@ function showError(el, msg) {
   const box = el.querySelector("#import-meta");
   box.hidden = false;
   box.innerHTML = `<div class="import-error">${esc(msg)}</div>`;
+}
+
+// ---------- Library picker ----------
+
+function emptyLibPicker() {
+  return {
+    step: "shows",
+    showId: null,
+    showEntry: null,
+    showData: null,
+    selected: new Set(),
+    loading: false,
+    error: "",
+  };
+}
+
+async function openLibraryPicker(el, ctx) {
+  libPicker = emptyLibPicker();
+  libPicker.loading = true;
+  session = null;
+  swipeDetach = null;
+  el.querySelector("#import-result").hidden = true;
+  resetImportFileForm(el);
+  renderLibraryPicker(el, ctx);
+
+  try {
+    const index = await getLibraryIndex();
+    libPicker.index = index;
+    libPicker.loading = false;
+    if (index.loadError) {
+      libPicker.error = "Не удалось загрузить data/library/index.json. Откройте приложение через локальный сервер из корня проекта (не двойным кликом по index.html).";
+    } else if (!index.shows.length) {
+      libPicker.error = "Библиотека пуста — положите файлы в data/library/ и обновите index.json.";
+    }
+  } catch (err) {
+    libPicker.loading = false;
+    libPicker.error = err.message || String(err);
+  }
+  renderLibraryPicker(el, ctx);
+}
+
+function renderLibraryPicker(el, ctx) {
+  const box = el.querySelector("#import-library");
+  if (!box || !libPicker) return;
+  box.hidden = false;
+
+  if (libPicker.loading) {
+    box.innerHTML = `<div class="card card-padded"><p class="muted">Загрузка библиотеки…</p></div>`;
+    return;
+  }
+
+  if (libPicker.error && libPicker.step === "shows") {
+    box.innerHTML = `
+      <div class="card card-padded lib-panel">
+        <div class="lib-head">
+          <h2 class="settings-heading">Библиотека сериалов</h2>
+          <button type="button" class="btn btn-sm outline" id="lib-close">Закрыть</button>
+        </div>
+        <p class="settings-empty">${esc(libPicker.error)}</p>
+      </div>`;
+    box.querySelector("#lib-close")?.addEventListener("click", () => closeLibraryPicker(el));
+    return;
+  }
+
+  if (libPicker.step === "shows") {
+    renderLibraryShowList(el, ctx, box);
+    return;
+  }
+
+  renderLibraryEpisodePicker(el, ctx, box);
+}
+
+function renderLibraryShowList(el, ctx, box) {
+  const shows = libPicker.index?.shows || [];
+  box.innerHTML = `
+    <div class="card card-padded lib-panel">
+      <div class="lib-head">
+        <h2 class="settings-heading">Библиотека сериалов</h2>
+        <button type="button" class="btn btn-sm outline" id="lib-close">Закрыть</button>
+      </div>
+      <p class="settings-hint">Готовые наборы с переводами — выберите сериал.</p>
+      <div class="lib-shows">
+        ${shows.length
+    ? shows.map((s) => `
+          <button type="button" class="lib-show card card-padded" data-show-id="${escAttr(s.id)}">
+            <span class="lib-show-title">${esc(s.title)}</span>
+            <span class="settings-hint">${s.seasons} сез · ${s.episodes} серий</span>
+          </button>`).join("")
+    : `<p class="settings-empty">Нет сериалов в библиотеке.</p>`}
+      </div>
+    </div>`;
+
+  box.querySelector("#lib-close")?.addEventListener("click", () => closeLibraryPicker(el));
+  box.querySelectorAll(".lib-show").forEach((btn) => {
+    btn.addEventListener("click", () => selectLibraryShow(el, ctx, btn.dataset.showId));
+  });
+}
+
+async function selectLibraryShow(el, ctx, showId) {
+  libPicker.showId = showId;
+  libPicker.showEntry = libPicker.index.shows.find((s) => s.id === showId) || null;
+  libPicker.selected = new Set();
+  libPicker.loading = true;
+  libPicker.step = "episodes";
+  renderLibraryPicker(el, ctx);
+
+  try {
+    libPicker.showData = await getLibraryShow(showId);
+    libPicker.loading = false;
+    if (!libPicker.showData) {
+      libPicker.error = "Не удалось загрузить файл сериала.";
+      libPicker.step = "shows";
+    }
+  } catch (err) {
+    libPicker.loading = false;
+    libPicker.error = err.message || String(err);
+    libPicker.step = "shows";
+  }
+  renderLibraryPicker(el, ctx);
+}
+
+function renderLibraryEpisodePicker(el, ctx, box) {
+  const show = libPicker.showData;
+  const episodes = listShowEpisodes(show);
+  const selected = libPicker.selected;
+  const allSelected = episodes.length > 0 && episodes.every((ep) => selected.has(ep.key));
+
+  const bySeason = new Map();
+  for (const ep of episodes) {
+    if (!bySeason.has(ep.season)) bySeason.set(ep.season, []);
+    bySeason.get(ep.season).push(ep);
+  }
+
+  const seasonBlocks = [...bySeason.entries()]
+    .sort((a, b) => a[0] - b[0])
+    .map(([seasonNum, eps]) => {
+      const seasonAll = eps.every((ep) => selected.has(ep.key));
+      return `
+        <div class="lib-season">
+          <div class="lib-season-head">
+            <span class="lib-season-title">Сезон ${seasonNum}</span>
+            <button type="button" class="btn btn-sm outline lib-season-all" data-season="${seasonNum}">
+              ${seasonAll ? "Снять сезон" : "Весь сезон"}
+            </button>
+          </div>
+          <div class="lib-episodes">
+            ${eps.map((ep) => `
+              <label class="lib-ep">
+                <input type="checkbox" data-key="${escAttr(ep.key)}" ${selected.has(ep.key) ? "checked" : ""} />
+                <span class="lib-ep-code">S${String(ep.season).padStart(2, "0")}E${String(ep.episode).padStart(2, "0")}</span>
+                <span class="lib-ep-title">${esc(ep.title || "—")}</span>
+                <span class="lib-ep-meta">${ep.words} сл · ${ep.phrases} фр</span>
+              </label>`).join("")}
+          </div>
+        </div>`;
+    }).join("");
+
+  box.innerHTML = `
+    <div class="card card-padded lib-panel lib-panel-episodes">
+      <div class="lib-head">
+        <button type="button" class="btn btn-sm outline" id="lib-back-shows">← Сериалы</button>
+        <div class="lib-head-main">
+          <h2 class="settings-heading">${esc(show?.title || libPicker.showEntry?.title || "Сериал")}</h2>
+          <p class="settings-hint">${episodes.length} серий в наборе</p>
+        </div>
+        <button type="button" class="btn btn-sm outline" id="lib-close">Закрыть</button>
+      </div>
+
+      <div class="lib-bulk-row">
+        <button type="button" class="btn btn-sm outline" id="lib-all-show">${allSelected ? "Снять всё" : "Весь сериал"}</button>
+      </div>
+
+      ${seasonBlocks || `<p class="settings-empty">В файле нет серий.</p>`}
+
+      <div class="lib-actionbar">
+        <span class="lib-actionbar-count">Выбрано: ${selected.size}</span>
+        <button type="button" class="btn" id="lib-import-btn" ${selected.size ? "" : "disabled"}>
+          Импортировать выбранные (${selected.size})
+        </button>
+      </div>
+    </div>`;
+
+  box.querySelector("#lib-close")?.addEventListener("click", () => closeLibraryPicker(el));
+  box.querySelector("#lib-back-shows")?.addEventListener("click", () => {
+    libPicker.step = "shows";
+    libPicker.showData = null;
+    libPicker.selected = new Set();
+    renderLibraryPicker(el, ctx);
+  });
+
+  box.querySelector("#lib-all-show")?.addEventListener("click", () => {
+    if (allSelected) episodes.forEach((ep) => selected.delete(ep.key));
+    else episodes.forEach((ep) => selected.add(ep.key));
+    renderLibraryEpisodePicker(el, ctx, box);
+  });
+
+  box.querySelectorAll(".lib-season-all").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      const seasonNum = +btn.dataset.season;
+      const eps = episodes.filter((ep) => ep.season === seasonNum);
+      const seasonAll = eps.every((ep) => selected.has(ep.key));
+      if (seasonAll) eps.forEach((ep) => selected.delete(ep.key));
+      else eps.forEach((ep) => selected.add(ep.key));
+      renderLibraryEpisodePicker(el, ctx, box);
+    });
+  });
+
+  box.querySelectorAll(".lib-ep input[type=checkbox]").forEach((cb) => {
+    cb.addEventListener("change", () => {
+      const key = cb.dataset.key;
+      if (cb.checked) selected.add(key);
+      else selected.delete(key);
+      renderLibraryEpisodePicker(el, ctx, box);
+    });
+  });
+
+  box.querySelector("#lib-import-btn")?.addEventListener("click", () => {
+    if (!selected.size) return;
+    runLibraryImport(el, ctx);
+  });
+}
+
+function closeLibraryPicker(el) {
+  libPicker = null;
+  const box = el.querySelector("#import-library");
+  if (box) {
+    box.hidden = true;
+    box.innerHTML = "";
+  }
+}
+
+async function runLibraryImport(el, ctx) {
+  if (!libPicker?.showData || !libPicker.selected.size) return;
+
+  const btn = el.querySelector("#lib-import-btn");
+  if (btn) {
+    btn.disabled = true;
+    btn.textContent = "Импорт…";
+  }
+
+  try {
+    const dict = await getDictionary();
+    const phrasesDb = await getPhrases();
+    const selections = [...libPicker.selected].map((key) => parseEpisodeKey(key));
+    const result = importLibraryEpisodes(ctx.state, libPicker.showData, selections, { dict, phrasesDb });
+    ctx.save();
+
+    const showTitle = libPicker.showData.title || libPicker.showEntry?.title || "Сериал";
+    const label = result.sources.length === 1
+      ? `${showTitle} · ${result.sources[0].label}`
+      : `${showTitle} · ${result.sources.length} серий`;
+
+    closeLibraryPicker(el);
+    renderLibraryCommitted(el, ctx, {
+      wordRes: result.words,
+      phraseRes: result.phrases,
+      label,
+      episodeCount: result.sources.length,
+    });
+  } catch (err) {
+    if (btn) {
+      btn.disabled = false;
+      btn.textContent = `Импортировать выбранные (${libPicker.selected.size})`;
+    }
+    libPicker.error = err.message || String(err);
+    renderLibraryPicker(el, ctx);
+  }
+}
+
+function renderLibraryCommitted(el, ctx, { wordRes, phraseRes, label, episodeCount }) {
+  const box = el.querySelector("#import-result");
+  if (!box) return;
+
+  const stats = getAppStats(ctx.state);
+  const noTrans = stats.noTransWords + stats.noTransPhrases;
+  const addedTotal = wordRes.added + wordRes.updated + phraseRes.added + phraseRes.updated;
+
+  unbindScrollTop();
+
+  box.hidden = false;
+  box.innerHTML = `
+    <div class="card card-padded import-section-gap import-committed">
+      <div class="import-done import-done-prominent">
+        Импорт из библиотеки: <b>${episodeCount}</b> ${episodeCount === 1 ? "серия" : "серий"}.
+        Слова: <b>+${wordRes.added}</b> / обновлено <b>${wordRes.updated}</b>.
+        Выражения: <b>+${phraseRes.added}</b> / обновлено <b>${phraseRes.updated}</b>.
+        <br>${esc(label)}
+        ${noTrans ? `<p class="import-done-hint c-missing">${noTrans} без перевода — дополните в «База знаний → Изучать».</p>` : ""}
+      </div>
+      ${(noTrans || addedTotal) ? `
+      <div class="import-done-actions">
+        ${noTrans ? `<button type="button" id="import-go-knowledge" class="btn btn-sm">Дополнить переводы</button>` : ""}
+        ${addedTotal ? `<button type="button" id="import-go-training" class="btn btn-sm outline">К тренировке</button>` : ""}
+      </div>` : ""}
+    </div>`;
+
+  el.querySelector("#import-go-knowledge")?.addEventListener("click", () => {
+    ctx.navigateTo?.("knowledge");
+  });
+  el.querySelector("#import-go-training")?.addEventListener("click", () => {
+    ctx.navigateTo?.("training");
+  });
+}
+
+function escAttr(s) {
+  return esc(s).replace(/"/g, "&quot;");
 }
 
 function esc(s) {

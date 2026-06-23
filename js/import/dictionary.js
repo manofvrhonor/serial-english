@@ -74,10 +74,13 @@ export function getFormsIndex() {
   return _forms || {};
 }
 
+/** Сколько переводов подставляем из офлайн-словаря при импорте и материализации */
+export const SUGGEST_TRANS_LIMIT = 2;
+
 export function translate(lemma, dict) {
   if (!dict || !lemma) return [];
   const key = String(lemma).toLowerCase().trim();
-  return Array.isArray(dict[key]) ? dict[key].slice(0, 3) : [];
+  return Array.isArray(dict[key]) ? dict[key].slice(0, SUGGEST_TRANS_LIMIT) : [];
 }
 
 export function lookupAll(lemma, dict) {

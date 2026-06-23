@@ -420,11 +420,10 @@ function stopPhrasesEmptyRow() {
 function learnedWordRow(entry) {
   const { lemma, word } = entry;
   const trans = word?.translations?.length ? word.translations.join(", ") : "—";
-  const inCards = word ? `<span class="tag tag-manual">в карточках</span>` : "";
 
   return `
     <tr data-lemma="${escAttr(lemma)}">
-      <td class="col-word"><strong>${esc(lemma)}</strong>${inCards ? ` ${inCards}` : ""}</td>
+      <td class="col-word"><strong>${esc(lemma)}</strong></td>
       <td class="col-trans-cell">${esc(trans)}</td>
       <td class="col-actions">
         <div class="row-actions">
@@ -441,8 +440,7 @@ function learnedPhraseRow(entry) {
 
   return `
     <tr data-text="${escAttr(text)}">
-      <td class="col-word"><strong>${esc(text)}</strong>
-        ${phrase ? ` <span class="tag tag-manual">в карточках</span>` : ""}</td>
+      <td class="col-word"><strong>${esc(text)}</strong></td>
       <td class="col-trans-cell">${esc(trans)}</td>
       <td class="col-actions">
         <div class="row-actions">
@@ -454,13 +452,12 @@ function learnedPhraseRow(entry) {
 }
 
 function stopWordRow(entry) {
-  const { lemma, translations, word } = entry;
+  const { lemma, translations } = entry;
   const trans = translations?.length ? translations.join(", ") : "—";
-  const inCards = word ? `<span class="tag tag-manual">в карточках</span>` : "";
 
   return `
     <tr data-lemma="${escAttr(lemma)}">
-      <td class="col-word"><strong>${esc(lemma)}</strong>${inCards ? ` ${inCards}` : ""}</td>
+      <td class="col-word"><strong>${esc(lemma)}</strong></td>
       <td class="col-trans-cell">${esc(trans)}</td>
       <td class="col-actions">
         <div class="row-actions">

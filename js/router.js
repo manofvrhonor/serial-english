@@ -1,16 +1,20 @@
-import { renderImport } from "./views/import.js?v=20260639";
+import { renderImport } from "./views/import.js?v=20260655";
 
-import { renderKnowledge } from "./views/knowledge.js?v=20260639";
+import { renderKnowledge } from "./views/knowledge.js?v=20260655";
 
-import { renderTraining } from "./views/training.js?v=20260639";
+import { renderTraining } from "./views/training.js?v=20260655";
 
-import { renderShows } from "./views/shows.js?v=20260639";
+import { renderShows } from "./views/shows.js?v=20260655";
 
-import { renderBooks } from "./views/books.js?v=20260639";
+import { renderBooks } from "./views/books.js?v=20260655";
 
-import { renderSettings } from "./views/settings.js?v=20260639";
+import { renderSettings } from "./views/settings.js?v=20260655";
 
-import { refreshPageScrollTop } from "./ui/scroll-top.js?v=20260639";
+import { renderAdminLibrary } from "./views/admin-library.js?v=20260655";
+
+import { refreshPageScrollTop } from "./ui/scroll-top.js?v=20260655";
+
+import { isAdminMode } from "./core/admin-gate.js";
 
 
 
@@ -28,6 +32,8 @@ const routes = {
 
   settings: renderSettings,
 
+  "library-admin": renderAdminLibrary,
+
   words: renderKnowledge,
 
   phrases: renderKnowledge,
@@ -44,7 +50,9 @@ let appCtx = null;
 
 function setActiveNav(route) {
 
-  const navRoute = route === "words" || route === "phrases" ? "knowledge" : route;
+  const navRoute = route === "words" || route === "phrases" ? "knowledge"
+    : route === "library-admin" ? "settings"
+    : route;
 
 
 
@@ -59,6 +67,10 @@ function setActiveNav(route) {
 
 
 export function navigateTo(route, options = {}) {
+
+  if (route === "library-admin" && !isAdminMode()) {
+    route = "settings";
+  }
 
   const render = routes[route];
 

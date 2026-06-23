@@ -119,7 +119,7 @@ export function ensureSnapshotItems(state, sourceId, dict, phrasesDb) {
   for (const lemma of words) {
     const l = String(lemma).toLowerCase().trim();
     if (!l || isKnownLemma(state, l) || isStopWord(state, l) || findWordByLemma(state, l)) continue;
-    const translations = dict ? translate(lemma, dict).filter(Boolean).slice(0, 3) : [];
+    const translations = dict ? translate(lemma, dict).filter(Boolean) : [];
     addWords(state, [{ lemma: String(lemma).trim(), translations }], sourceId);
     changed = true;
   }
@@ -127,7 +127,7 @@ export function ensureSnapshotItems(state, sourceId, dict, phrasesDb) {
   for (const text of phrases) {
     const t = String(text).toLowerCase().trim();
     if (!t || isKnownPhrase(state, t) || findPhraseByText(state, t)) continue;
-    const translations = phrasesDb ? translatePhrase(text, phrasesDb).filter(Boolean).slice(0, 3) : [];
+    const translations = phrasesDb ? translatePhrase(text, phrasesDb).filter(Boolean) : [];
     addPhrases(state, [{ text: String(text).trim(), translations }], sourceId);
     changed = true;
   }

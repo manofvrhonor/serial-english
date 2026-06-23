@@ -75,11 +75,11 @@ flowchart TD
 5. CSS, bump версий, документация.
 
 ## To-do (для следующей сессии)
-- [ ] **admin_gate** — Settings: тумблер + пароль 54321 (флаг localStorage); роут `library-admin`; кнопка перехода.
-- [ ] **zip_reader** — `js/import/zip.js`: нативная распаковка zip + копия для несжатых.
-- [ ] **admin_tool** — `js/views/admin-library.js`: zip → parseSrt → analyze → курирование → черновик в localStorage.
-- [ ] **export** — экспорт `<id>.json` + мердж `index.json`.
-- [ ] **lib_format** — `data/library/index.json` + `js/import/library.js` (+ `importLibraryEpisodes`).
-- [ ] **user_picker** — `import.js`: кнопка + пикер сериалы/сезоны/серии + авто-импорт + сводка.
-- [ ] **css** — стили пикера и админ-инструмента.
-- [ ] **version_docs** — bump `?v=` до 20260640, `version.js`; обновить agent-spec/changelog/agent-plan.
+- [x] **admin_gate** — Settings: тумблер + пароль 54321 (флаг localStorage); роут `library-admin`; кнопка перехода.
+- [x] **zip_reader** — `js/import/zip.js`: нативная распаковка zip + копия для несжатых.
+- [x] **admin_tool** — `js/views/admin-library.js`: zip → parseSrt → analyze → курирование → черновик в localStorage.
+- [x] **export** — экспорт `<id>.json` + мердж `index.json`.
+- [x] **lib_format** — `data/library/` + `js/import/library.js` + `importLibraryEpisodes`.
+- [x] **user_picker** — `import.js`: кнопка + пикер + авто-импорт + сводка.
+- [x] **css** — стили админ-инструмента и пикера библиотеки.
+- [x] **version_docs** — agent-spec §5.1, changelog, push `?v=20260655`.
