@@ -21,7 +21,7 @@
 4. Не сканировать `data/*.json` — только нужные `js/` файлы
 5. Dev: `python -m http.server 8081` → http://localhost:8081
 6. Прод: https://manofvrhonor.github.io/serial-english/
-7. Asset version: **`20260674`** в рабочем дереве (Путь B, не закоммичено); на проде — `20260673`. Источник: `js/version.js`; bump при правках JS/CSS
+7. Asset version: **`20260675`** в ветке `dev` (Путь B, закоммичено); на проде (`main`) — `20260673`. Источник: `js/version.js`; bump при правках JS/CSS
 
 **После сессии:** обновить §1 и §7 здесь; 5–15 строк в `docs/agent-changelog.md`.
 
@@ -36,7 +36,7 @@
 | Публикация для теста | ✓ GitHub Pages |
 | GitHub | manofvrhonor/serial-english |
 | Lovable-референс | `D:\VIBECODING\word-weaver-offline` |
-| Путь B (бэкенд/аккаунты/синхронизация) | ⏳ код в рабочем дереве, НЕ закоммичено |
+| Путь B (бэкенд/аккаунты/синхронизация) | ⏳ закоммичено в `dev`, локально протестировано (вход/синхр./библиотека/Alembic); merge в `main` — после теста |
 
 **Текущая фаза:** **Путь B** — добавлен бэкенд (`backend/`, FastAPI) + аккаунты/синхронизация
 на фронте (секция в Настройках). Аддитивно: без адреса сервера приложение работает как оффлайн.
@@ -237,13 +237,17 @@ serial-english/
 
 ## 7. Следующий шаг
 
-**Путь B (продолжить со следующей сессии):**
-1. Создать ветку **`dev`** и `.cursorignore` — команды/содержимое в `docs/path-b-runbook.md` (требуют терминала).
-2. Запустить бэкенд (`backend/`, `uvicorn`) + фронт (`http.server 8081`), протестировать вход/регистрацию/синхронизацию.
-3. Перенести тестовый сериал на сервер (`POST /api/library/gravity-falls`).
-4. После теста на `dev` — merge в `main` (bump `?v=` при необходимости).
-5. Деплой бэкенда в РФ — `docs/deploy-runbook.md` (Timeweb + Dockploy, занятия 6-7).
-6. Создать первую миграцию Alembic (`alembic revision --autogenerate -m "init"`).
+**Путь B — сделано (ветка `dev`, локально):**
+- ✅ Ветка `dev` + `.cursorignore`; код Пути B закоммичен (`bc87616`).
+- ✅ Бэкенд (`uvicorn :8000`, SQLite) + фронт (`http.server 8081`); вход/регистрация — ОК.
+- ✅ Синхронизация прогресса (round-trip `PUT`/`GET /api/progress`).
+- ✅ Серверная библиотека: `POST /api/library/gravity-falls` (админ через `ADMIN_EMAILS`).
+- ✅ Alembic init-миграция `3eb6b669eae6` (`15c9b74`); локальная `app.db` — `stamp head`.
+
+**Путь B — осталось:**
+1. (Опц.) UI-тест в браузере: тумблер «библиотека с сервера», пикер в Каталоге.
+2. После полного теста на `dev` — merge в `main` (bump `?v=` при необходимости).
+3. Деплой бэкенда в РФ — `docs/deploy-runbook.md` (Timeweb + Dockploy, занятия 6-7).
 
 **Dev:** `python -m http.server 8081` (фронт) + `uvicorn app.main:app --reload --port 8000` (бэкенд).
 
