@@ -5,6 +5,7 @@ import {
   hardResetState,
 } from "../db/database.js";
 import { isAdminMode, setAdminMode, verifyAdminPassword } from "../core/admin-gate.js";
+import { renderAccountSection } from "./account-ui.js";
 
 export function renderSettings(el, ctx) {
   const intervals = ctx.state.settings?.intervals || [1, 3, 7, 16, 30];
@@ -39,6 +40,8 @@ export function renderSettings(el, ctx) {
         </div>
         <p id="settingsMsg" class="settings-msg"></p>
       </section>
+
+      <section class="card card-padded settings-card" id="account-section"></section>
 
       <section class="card card-padded settings-card">
         <h2 class="settings-heading">Админ-режим</h2>
@@ -226,6 +229,9 @@ export function renderSettings(el, ctx) {
     renderSettings(el, ctx);
     flash(el, "Данные полностью сброшены");
   });
+
+  // Секция «Аккаунт и синхронизация» (Путь B). Изолирована в account-ui.js.
+  renderAccountSection(el, ctx);
 }
 
 function flash(el, text, isError = false) {

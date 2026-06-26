@@ -16,6 +16,8 @@ import {
 } from "../db/database.js";
 import { translate } from "./dictionary.js";
 import { translatePhrase } from "./phrases.js";
+import { isServerLibraryEnabled } from "../api/config.js";
+import { serverLibraryIndex, serverLibraryShow } from "../api/client.js";
 
 const INDEX_URL = "./data/library/index.json";
 
@@ -70,7 +72,17 @@ export async function getLibraryIndex() {
 
   _indexLoading = (async () => {
     try {
-      const data = await fetchJson(INDEX_URL);
+      let data;
+      if (isServerLibraryEnabled()) {
+        try {
+          data = await serverLibraryIndex();
+        } catch (e) {
+          console.warn("Серверная библиотека недоступна — локальный индекс", e);
+          data = await fetchJson(INDEX_URL);
+        }
+      } else {
+        data = await fetchJson(INDEX_URL);
+      }
       _index = {
         shows: Array.isArray(data?.shows)
           ? data.shows.map((s) => ({
@@ -109,7 +121,18 @@ export async function getLibraryShow(showId) {
       const entry = index.shows.find((s) => s.id === id);
       const file = entry?.file || `${id}.json`;
       try {
-        const data = normalizeShow(await fetchJson(`./data/library/${file}`));
+        let raw;
+        if (isServerLibraryEnabled()) {
+          try {
+            raw = await serverLibraryShow(id);
+          } catch (e) {
+            console.warn(`Серверный сериал недоступен — локальный файл: ${id}`, e);
+            raw = await fetchJson(`./data/library/${file}`);
+          }
+        } else {
+          raw = await fetchJson(`./data/library/${file}`);
+        }
+        const data = normalizeShow(raw);
         if (data?.id) _showCache.set(id, data);
         return data;
       } catch {

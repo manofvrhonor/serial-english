@@ -1,0 +1,36 @@
+# Локальный «прод-подобный» запуск: бэкенд + PostgreSQL.
+# На сервере Dockploy обычно создаёт сервис PostgreSQL отдельно (занятие 7),
+# а приложение получает DATABASE_URL через Environment. Этот compose удобен
+# для проверки связки app+postgres локально перед деплоем.
+services:
+  db:
+    image: postgres:18
+    environment:
+      POSTGRES_USER: serial
+      POSTGRES_PASSWORD: serial
+      POSTGRES_DB: serial_english
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U serial -d serial_english"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  api:
+    build: .
+    environment:
+      DATABASE_URL: postgresql+psycopg2://serial:serial@db:5432/serial_english
+      JWT_SECRET: ${JWT_SECRET:-change-me-local-only}
+      CORS_ORIGINS: ${CORS_ORIGINS:-*}
+      ADMIN_EMAILS: ${ADMIN_EMAILS:-}
+    depends_on:
+      db:
+        condition: service_healthy
+    ports:
+      - "8000:8000"
+
+volumes:
+  pgdata:

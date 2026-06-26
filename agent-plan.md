@@ -7,6 +7,9 @@
 | **`agent-plan.md`** (этот) | Каждая сессия: статус, архитектура, gotchas, структура |
 | `docs/agent-spec.md` | Смена архитектуры, SRS, импорт, модель данных |
 | `docs/agent-changelog.md` | «Когда и зачем сделали», история коммитов |
+| `docs/backend-spec.md` | Путь B: бэкенд (модель данных, API, синхронизация) |
+| `docs/deploy-runbook.md` | Деплой бэкенда (Timeweb + Dockploy, занятия 6-7) |
+| `docs/path-b-runbook.md` | Команды для ручного запуска Пути B (dev-ветка, локальный запуск) |
 
 ---
 
@@ -18,7 +21,7 @@
 4. Не сканировать `data/*.json` — только нужные `js/` файлы
 5. Dev: `python -m http.server 8081` → http://localhost:8081
 6. Прод: https://manofvrhonor.github.io/serial-english/
-7. Asset version: **`20260673`** — единый `?v=`; источник: `js/version.js`; bump при правках JS/CSS
+7. Asset version: **`20260674`** в рабочем дереве (Путь B, не закоммичено); на проде — `20260673`. Источник: `js/version.js`; bump при правках JS/CSS
 
 **После сессии:** обновить §1 и §7 здесь; 5–15 строк в `docs/agent-changelog.md`.
 
@@ -33,10 +36,13 @@
 | Публикация для теста | ✓ GitHub Pages |
 | GitHub | manofvrhonor/serial-english |
 | Lovable-референс | `D:\VIBECODING\word-weaver-offline` |
+| Путь B (бэкенд/аккаунты/синхронизация) | ⏳ код в рабочем дереве, НЕ закоммичено |
 
-**Текущая фаза:** polish **mobile UX** (тренировка, HARD RESET, отображение слов). Каталог + библиотека + админ — закрыты.
+**Текущая фаза:** **Путь B** — добавлен бэкенд (`backend/`, FastAPI) + аккаунты/синхронизация
+на фронте (секция в Настройках). Аддитивно: без адреса сервера приложение работает как оффлайн.
+См. план `serial_english_path_b`, `docs/backend-spec.md`, `docs/path-b-runbook.md`.
 
-**На проде (main):** после push — `?v=20260673`.
+**На проде (main):** `?v=20260673` (Путь B ещё не залит; merge — после теста на `dev`).
 
 **Не переписывать без необходимости:** `js/core/`, `js/db/`, `js/import/`.
 
@@ -178,6 +184,10 @@
 | Scroll-top не работает | Слушать `.content`, не `window` |
 | Нет переводов на проде | В Git должны быть `data/dictionary.json.gz`, `data/forms.json.gz` |
 | Сборка словаря | `node scripts/build-dictionary.mjs` (интернет один раз) |
+| **Путь B:** серверные функции не появляются | Включаются только при заданном адресе сервера (Настройки → Аккаунт). Иначе — чистый оффлайн |
+| **Путь B:** `.cursorignore` не создаётся агентом | Защищённый файл; создать вручную — содержимое в `docs/path-b-runbook.md` |
+| **Путь B:** mixed-content при тесте | Фронт по HTTPS + бэк по `http://localhost` браузер блокирует; тестировать оба локально (8081 + 8000) |
+| **Путь B:** синхронизация | Весь `state` — один JSON-блоб (last-write-wins по `updated_at`); `js/sync/sync.js` |
 
 ---
 
@@ -186,21 +196,24 @@
 ```
 serial-english/
 ├── index.html, agent-plan.md
-├── docs/agent-spec.md, docs/agent-changelog.md
+├── docs/  agent-spec.md, agent-changelog.md, backend-spec.md, deploy-runbook.md, path-b-runbook.md
 ├── .nojekyll, netlify.toml, .github/workflows/deploy-pages.yml
 ├── css/styles.css
 ├── data/  dictionary.json.gz, forms.json.gz, phrases.json, translation-overrides.json
 ├── scripts/  build-dictionary.mjs
+├── backend/                       ← Путь B: FastAPI (app/main, models, routers/, security, deps), Dockerfile, alembic/
 └── js/
     ├── app.js, router.js          ← ctx.startPrepTraining, openSourceVocab, closeSourceVocab
+    ├── api/  config.js, client.js  ← Путь B: адрес сервера/токен (localStorage), HTTP-клиент
+    ├── sync/ sync.js               ← Путь B: синхронизация state ↔ сервер (push/pull/smart)
     ├── ui/  swipe-card, trans-chips, scroll-top, sources-modal, train-edit-modal, action-icons, version.js
     ├── db/database.js
-    ├── import/  dictionary.js, phrases.js
+    ├── import/  dictionary.js, phrases.js, library.js (опц. с сервера)
     ├── core/  analyzer, parser, lemmatizer, srs, readiness.js, display-text.js, …
     └── views/
         ├── catalog.js, import.js, knowledge.js, training.js
         ├── study-words.js, study-phrases.js
-        ├── shows.js, books.js, source-vocab.js, settings.js
+        ├── shows.js, books.js, source-vocab.js, settings.js, account-ui.js (Путь B)
 ```
 
 Модалы в `index.html`: `#import-confirm-modal`, `#kb-add-modal` (добавление слова/выражения из Базы знаний).
@@ -224,8 +237,14 @@ serial-english/
 
 ## 7. Следующий шаг
 
-**Mobile polish** — в `main` после push (`?v=20260673`). Дальше по желанию: второй сериал в библиотеку, PWA, polish админ-курирования.
+**Путь B (продолжить со следующей сессии):**
+1. Создать ветку **`dev`** и `.cursorignore` — команды/содержимое в `docs/path-b-runbook.md` (требуют терминала).
+2. Запустить бэкенд (`backend/`, `uvicorn`) + фронт (`http.server 8081`), протестировать вход/регистрацию/синхронизацию.
+3. Перенести тестовый сериал на сервер (`POST /api/library/gravity-falls`).
+4. После теста на `dev` — merge в `main` (bump `?v=` при необходимости).
+5. Деплой бэкенда в РФ — `docs/deploy-runbook.md` (Timeweb + Dockploy, занятия 6-7).
+6. Создать первую миграцию Alembic (`alembic revision --autogenerate -m "init"`).
 
-**Dev:** `python -m http.server 8081` из корня проекта — библиотека не работает через `file://`.
+**Dev:** `python -m http.server 8081` (фронт) + `uvicorn app.main:app --reload --port 8000` (бэкенд).
 
-Отложено (не блокеры): PWA, облако, полный SM-2 — см. `docs/agent-spec.md` §10.
+Отложено: мобилка (Expo, занятия 2/5), PWA, полный SM-2 — см. план §5 и `docs/agent-spec.md` §10.

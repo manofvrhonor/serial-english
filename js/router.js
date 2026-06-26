@@ -4,7 +4,7 @@ import { renderKnowledge } from "./views/knowledge.js?v=20260666";
 
 import { renderTraining } from "./views/training.js?v=20260671";
 
-import { renderSettings } from "./views/settings.js?v=20260673";
+import { renderSettings } from "./views/settings.js?v=20260674";
 
 import { renderAdminLibrary } from "./views/admin-library.js?v=20260666";
 

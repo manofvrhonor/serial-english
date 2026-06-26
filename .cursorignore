@@ -1,0 +1,17 @@
+﻿# Зависимости
+node_modules/
+backend/.venv/
+**/__pycache__/
+
+# Тяжёлые оффлайн-словари
+data/*.gz
+data/dictionary.json
+data/forms.json
+
+# Большие наборы библиотеки
+data/library/*.json
+
+# Сборки/временное
+dist/
+.next/
+*.log
