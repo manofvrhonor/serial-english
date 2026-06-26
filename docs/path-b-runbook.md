@@ -116,3 +116,19 @@ python -m http.server 8081
 - Протестировать на `dev` + локальном бэкенде.
 - При желании прогнать полный bump `?v=` (сейчас обновлены только изменённые файлы).
 - Бэкенд деплоить отдельно по `docs/deploy-runbook.md` (Timeweb + Dockploy).
+
+---
+
+## 7. Timeweb VPS — статус деплоя (2026-06-26)
+
+| | |
+|---|---|
+| Провайдер | Timeweb Cloud **MSK 40** (2 GB / 40 GB) |
+| IP | `45.93.201.28` |
+| REG.RU | **не используем** (только shared-хостинг; API туда не ставится) |
+| Локальный тест Пути B | ✅ пройден (`dev`, коммиты до `c2eeaca`) |
+| Merge `dev`→`main` | ⏳ не делали |
+| SSH | ❌ `Connection timed out` (firewall 22/80/443 — не помогло) |
+| Следующий шаг | VNC-консоль Timeweb → Docker/`docker compose` → HTTPS → merge `main` |
+
+> Root-пароль VPS не хранить в git/чате; после первого входа — `passwd` и SSH-ключ.

@@ -21,7 +21,7 @@
 4. Не сканировать `data/*.json` — только нужные `js/` файлы
 5. Dev: `python -m http.server 8081` → http://localhost:8081
 6. Прод: https://manofvrhonor.github.io/serial-english/
-7. Asset version: **`20260675`** в ветке `dev` (Путь B, закоммичено); на проде (`main`) — `20260673`. Источник: `js/version.js`; bump при правках JS/CSS
+7. Asset version: **`20260676`** в ветке `dev`; на проде (`main`) — `20260673`. Источник: `js/version.js`; bump при правках JS/CSS
 
 **После сессии:** обновить §1 и §7 здесь; 5–15 строк в `docs/agent-changelog.md`.
 
@@ -36,11 +36,14 @@
 | Публикация для теста | ✓ GitHub Pages |
 | GitHub | manofvrhonor/serial-english |
 | Lovable-референс | `D:\VIBECODING\word-weaver-offline` |
-| Путь B (бэкенд/аккаунты/синхронизация) | ⏳ закоммичено в `dev`, локально протестировано (вход/синхр./библиотека/Alembic); merge в `main` — после теста |
+| Путь B (бэкенд/аккаунты/синхронизация) | ⏳ в `dev` (локально ✓); VPS Timeweb заказан; **SSH на сервер не пускает** — деплой завтра |
 
-**Текущая фаза:** **Путь B** — добавлен бэкенд (`backend/`, FastAPI) + аккаунты/синхронизация
-на фронте (секция в Настройках). Аддитивно: без адреса сервера приложение работает как оффлайн.
-См. план `serial_english_path_b`, `docs/backend-spec.md`, `docs/path-b-runbook.md`.
+**Текущая фаза:** **Путь B** — код в `dev`, локально проверен (вход, синхронизация, библиотека).
+Деплой: **Timeweb Cloud VPS MSK 40** (2 GB / 40 GB), IP `45.93.201.28` — настройка
+заблокирована: `ssh root@…` → `Connection timed out` (облачный Firewall: правила
+TCP 22/80/443 «для всех» — не помогло; следующая сессия: VNC-консоль Timeweb).
+REG.RU **обычный хостинг** для API не подходит; выбран путь преподавателя (Timeweb + Dockploy,
+см. `docs/deploy-runbook.md`). Merge `dev`→`main` — **ещё не делали** (Pages без Пути B).
 
 **На проде (main):** `?v=20260673` (Путь B ещё не залит; merge — после теста на `dev`).
 
@@ -237,18 +240,20 @@ serial-english/
 
 ## 7. Следующий шаг
 
-**Путь B — сделано (ветка `dev`, локально):**
-- ✅ Ветка `dev` + `.cursorignore`; код Пути B закоммичен (`bc87616`).
-- ✅ Бэкенд (`uvicorn :8000`, SQLite) + фронт (`http.server 8081`); вход/регистрация — ОК.
-- ✅ Синхронизация прогресса (round-trip `PUT`/`GET /api/progress`).
-- ✅ Серверная библиотека: `POST /api/library/gravity-falls` (админ через `ADMIN_EMAILS`).
-- ✅ Alembic init-миграция `3eb6b669eae6` (`15c9b74`); локальная `app.db` — `stamp head`.
+**Путь B — сделано (ветка `dev`, локально + GitHub):**
+- ✅ Ветка `dev` + `.cursorignore`; Путь B и фиксы — коммиты `bc87616`…`c2eeaca`.
+- ✅ Локально: `uvicorn :8000` + `http.server 8081`; вход, синхронизация (UI ✔), библиотека API.
+- ✅ Alembic init `3eb6b669eae6`; `normalizeApiBase()` (501 при `http:\host`); fix галочек после `rerender()`.
+- ✅ VPS **Timeweb Cloud MSK 40** заказан; IP **45.93.201.28**.
 
-**Путь B — осталось:**
-1. (Опц.) UI-тест в браузере: тумблер «библиотека с сервера», пикер в Каталоге.
-2. После полного теста на `dev` — merge в `main` (bump `?v=` при необходимости).
-3. Деплой бэкенда в РФ — `docs/deploy-runbook.md` (Timeweb + Dockploy, занятия 6-7).
+**Путь B — следующая сессия (деплой):**
+1. **SSH/VNC:** Timeweb → консоль VNC или починить SSH (firewall уже 22/80/443); **сменить root-пароль** (был в чате).
+2. На VPS: Docker → `docker compose` или Dockploy (`docs/deploy-runbook.md`).
+3. PostgreSQL + `JWT_SECRET`, `CORS_ORIGINS`, `ADMIN_EMAILS` в Environment.
+4. HTTPS (`api.…`) — домен на Timeweb; без HTTPS Pages не ходит на API.
+5. Merge **`dev`→`main`** — фронт с «Аккаунтом» на GitHub Pages.
+6. Прод-тест: регистрация → синхронизация с другого браузера.
 
-**Dev:** `python -m http.server 8081` (фронт) + `uvicorn app.main:app --reload --port 8000` (бэкенд).
+**Dev локально:** `python -m http.server 8081` + `backend/.venv` → `uvicorn app.main:app --port 8000`.
 
-Отложено: мобилка (Expo, занятия 2/5), PWA, полный SM-2 — см. план §5 и `docs/agent-spec.md` §10.
+Отложено: мобилка (Expo), PWA, полный SM-2 — см. `docs/agent-spec.md` §10.

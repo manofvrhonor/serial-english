@@ -5,53 +5,61 @@
 
 ---
 
-## Сессия 2026-06-26 — Путь B: бэкенд, аккаунты, синхронизация (НЕ закоммичено)
+## Сессия 2026-06-26 — Путь B: код, локальный тест, Timeweb VPS (открыта)
 
-Старт перехода с оффлайн-статики на серверную версию (аккаунты + облачная
-синхронизация прогресса + серверная библиотека). Roadmap — план `serial_english_path_b`;
-методика — занятия 2-7. Документы: `docs/backend-spec.md`, `docs/deploy-runbook.md`,
-`docs/path-b-runbook.md`.
+Roadmap — `serial_english_path_b`; методика занятий 2–7. Документы: `docs/backend-spec.md`,
+`docs/deploy-runbook.md`, `docs/path-b-runbook.md`.
 
-**Бэкенд (новое, `backend/`):** FastAPI + SQLAlchemy 2.0 + JWT (bcrypt). Эндпоинты
-`/api/auth/{register,login,me}`, `GET/PUT /api/progress` (снимок всего `state` одним
-JSON, last-write-wins), `GET/POST /api/library/{id}` (формат `data/library/*.json`),
-`/health`. SQLite→PostgreSQL, секреты в `.env`. Docker (`Dockerfile`, `docker-compose.yml`),
-Alembic-скелет, `.env.example`, `backend/README.md`.
+### Код и Git (`dev`, запушено на origin)
 
-**Фронтенд (аддитивно, оффлайн не сломан):** новые модули `js/api/config.js`,
-`js/api/client.js`, `js/sync/sync.js`, `js/views/account-ui.js`. В Настройках —
-секция «Аккаунт и синхронизация» (вход/регистрация, Синхронизировать/Выгрузить/Загрузить,
-тумблер серверной библиотеки). `js/import/library.js` — опционально грузит библиотеку
-с сервера (fallback на локальные файлы). Без адреса сервера приложение работает как раньше.
+**Бэкенд (`backend/`):** FastAPI + SQLAlchemy + JWT; `/api/auth/*`, `/api/progress`,
+`/api/library/*`, `/health`; Docker + Alembic; SQLite локально → PostgreSQL на деплое.
 
-**Версия:** bump `ASSET_VERSION` → `20260674`; обновлены `?v=` у изменённых файлов
-(`index.html`, `app.js`, `router.js`, `import.js`).
+**Фронт (аддитивно):** `js/api/*`, `js/sync/sync.js`, `js/views/account-ui.js`; секция
+«Аккаунт и синхронизация» в Настройках; без адреса сервера — оффлайн как раньше.
 
-**Фикс (локальный тест):** регистрация падала с 501 — адрес сервера был сохранён с
-обратным слэшем (`http:\localhost:8000`), браузер трактовал его как относительный путь
-и слал POST на статику (8081). Добавлен `normalizeApiBase()` в `js/api/config.js`
-(чинит обратные слэши, один слэш после схемы, отсутствие схемы, хвостовые слэши;
-нормализует и при чтении — самочинит уже сохранённые значения). Bump → `20260675`.
+**Коммиты в `dev`:**
+| Hash | Содержание |
+|------|------------|
+| `bc87616` | feat(path-b): backend + front integration, `.cursorignore` |
+| `15c9b74` | Alembic init `3eb6b669eae6` (users, progress, shows) |
+| `70e2efc` | docs: статус локального теста |
+| `c2eeaca` | fix: сообщения синхронизации после `rerender()`; `?v=20260676` |
 
-**Локальный тест Пути B (пройден, закоммичено в `dev`):**
-- Ветка `dev` создана/запушена; `.cursorignore` добавлен; код Пути B закоммичен (`bc87616`).
-- Бэкенд поднят (venv + `uvicorn :8000`, SQLite); регистрация/вход — ОК (вживую).
-- Синхронизация прогресса: round-trip `PUT`/`GET /api/progress` подтверждён.
-- Серверная библиотека: `POST /api/library/gravity-falls` (админ `probe@gmail.com`
-  через `ADMIN_EMAILS` в `.env`); `GET /api/library` отдаёт сериал (1 сезон, 20 серий).
-- Alembic: сгенерирована init-миграция `3eb6b669eae6` (users/progress/shows),
-  проверена на чистой БД, локальная `app.db` — `stamp head`; закоммичено (`15c9b74`).
+**Фаза 0:** ветка `dev` создана и запушена; `.cursorignore` (через терминал — файл защищён от агента).
 
-**Следующее:** UI-тест синхронизации/библиотеки в браузере (по желанию); затем merge
-`dev`→`main` после полного теста; деплой бэкенда по `deploy-runbook.md`.
+### Локальный тест (пройден)
 
-**НЕ сделано (среда сессии):** ветка `dev` и `.cursorignore` — терминал не выполнял
-команды, `.cursorignore` защищён от записи агентом → команды/содержимое в
-`docs/path-b-runbook.md`. Изменения **не закоммичены** (прод на `main` не затронут,
-остаётся `?v=20260673`).
+- Бэкенд: venv + `.env` + `uvicorn :8000`; фронт: `python -m http.server 8081`.
+- **501 при регистрации:** адрес `http:\localhost:8000` → POST на 8081; fix `normalizeApiBase()` в `js/api/config.js`.
+- Вход/регистрация, выгрузка/загрузка прогресса — ОК в браузере (после fix галочек в `account-ui.js`).
+- API: `POST/GET /api/library/gravity-falls` (админ через `ADMIN_EMAILS` в `backend/.env`).
+- Alembic: миграция проверена на чистой БД; локальная `app.db` — `alembic stamp head`.
 
-**Следующее:** создать `dev`, протестировать бэкенд+фронт локально (`path-b-runbook.md`),
-затем merge в `main`; деплой по `deploy-runbook.md`. Мобилка — отложена.
+### Хостинг и деплой (в процессе, не завершён)
+
+- **REG.RU обычный хостинг** — только статика; для API не подходит.
+- Выбран **Timeweb Cloud VPS MSK 40** (~882 ₽/мес, 2 GB / 40 GB, Москва) — путь преподавателя.
+- VPS создан: IP **`45.93.201.28`**, SSH `root@45.93.201.28`.
+- **Проблема:** `ssh` с ПК и из Cursor → `Connection timed out` / reset на banner.
+- В Timeweb создан **Firewall** (режим «разрешить»): ingress TCP **22, 80, 443** «для всех адресов», сервер привязан — **SSH всё ещё не пускает**.
+- **Merge `dev`→`main` не делали** — Pages на `?v=20260673` без Пути B.
+- **Безопасность:** root-пароль передавался в чат — **сменить** при первом входе (VNC или SSH).
+
+### Следующая сессия
+
+1. Timeweb → **VNC-консоль** сервера или диагностика SSH/firewall.
+2. Docker + `docker compose` (или Dockploy) по `deploy-runbook.md`.
+3. Домен + HTTPS для API; merge `dev`→`main`; прод-тест аккаунта/синхронизации.
+
+---
+
+## Сессия 2026-06-26 (ранняя) — Путь B: первый коммит кода
+
+*(Объединено в блок выше; ранее часть правок была только в рабочем дереве.)*
+
+Старт перехода на серверную версию. Бэкенд + фронт-интеграция описаны в коммите `bc87616`.
+Первоначальный bump `20260674`/`20260675`; актуальная версия в `dev` — **`20260676`**.
 
 ---
 
