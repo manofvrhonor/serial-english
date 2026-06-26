@@ -113,8 +113,8 @@ export function renderAccountSection(el, ctx) {
   root.querySelector("#api-base-save")?.addEventListener("click", () => {
     const val = root.querySelector("#api-base-input")?.value || "";
     setApiBase(val);
-    msg(val ? "Адрес сервера сохранён ✔" : "Адрес сервера очищен");
     rerender();
+    msg(val ? "Адрес сервера сохранён ✔" : "Адрес сервера очищен");
   });
 
   // --- Логин / регистрация ---
@@ -150,12 +150,12 @@ export function renderAccountSection(el, ctx) {
     try {
       const r = await fn(ctx);
       busy(btn, false);
+      rerender();
       if (r?.action === "empty") {
         msg("На сервере пока нет данных — выгрузите локальные.", false);
       } else {
         msg(okText);
       }
-      rerender();
     } catch (err) {
       busy(btn, false);
       if (err?.status === 401) {

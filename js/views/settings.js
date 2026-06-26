@@ -5,7 +5,7 @@ import {
   hardResetState,
 } from "../db/database.js";
 import { isAdminMode, setAdminMode, verifyAdminPassword } from "../core/admin-gate.js";
-import { renderAccountSection } from "./account-ui.js";
+import { renderAccountSection } from "./account-ui.js?v=20260676";
 
 export function renderSettings(el, ctx) {
   const intervals = ctx.state.settings?.intervals || [1, 3, 7, 16, 30];
